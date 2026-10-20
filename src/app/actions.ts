@@ -1,4 +1,4 @@
-"use server";
+﻿"use server";
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -13,17 +13,18 @@ export type LoginState = { error?: string };
 
 export async function login(
   _prev: LoginState,
-  formData: FormData,
+  formData: FormData
 ): Promise<LoginState> {
   const email = String(formData.get("email") ?? "");
   const password = String(formData.get("password") ?? "");
 
-  if (!checkCredentials(email, password)) {
-    return { error: "E-mail ou senha inválidos." };
+  const user = await checkCredentials(email, password);
+  if (!user) {
+    return { error: "E-mail ou senha incorretos." };
   }
 
   const jar = await cookies();
-  jar.set(SESSION_COOKIE, createSessionToken(email.trim().toLowerCase()), {
+  jar.set(SESSION_COOKIE, createSessionToken(user), {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",

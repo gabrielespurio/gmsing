@@ -1,0 +1,227 @@
+﻿import {
+  pgTable,
+  text,
+  timestamp,
+  integer,
+  boolean,
+  numeric,
+  jsonb,
+  uuid,
+  varchar,
+} from "drizzle-orm/pg-core";
+
+// USUÁRIOS
+export const users = pgTable("users", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  email: varchar("email", { length: 255 }).notNull().unique(),
+  passwordHash: text("password_hash").notNull(),
+  role: varchar("role", { length: 50 }).default("admin").notNull(), // admin, comercial, producao, financeiro
+  active: boolean("active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// CLIENTES
+export const clients = pgTable("clients", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  tradeName: varchar("trade_name", { length: 255 }),
+  document: varchar("document", { length: 30 }), // CPF ou CNPJ
+  personType: varchar("person_type", { length: 10 }).default("PJ").notNull(), // PF ou PJ
+  phone: varchar("phone", { length: 50 }),
+  whatsapp: varchar("whatsapp", { length: 50 }),
+  email: varchar("email", { length: 255 }),
+  address: text("address"),
+  city: varchar("city", { length: 100 }),
+  state: varchar("state", { length: 10 }),
+  contactPerson: varchar("contact_person", { length: 255 }),
+  notes: text("notes"),
+  active: boolean("active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// FORNECEDORES
+export const suppliers = pgTable("suppliers", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  tradeName: varchar("trade_name", { length: 255 }),
+  document: varchar("document", { length: 30 }),
+  phone: varchar("phone", { length: 50 }),
+  email: varchar("email", { length: 255 }),
+  address: text("address"),
+  contactPerson: varchar("contact_person", { length: 255 }),
+  notes: text("notes"),
+  active: boolean("active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// MATERIAIS
+export const materials = pgTable("materials", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  category: varchar("category", { length: 100 }).notNull(), // ACM, Lona, Vinil, Metalon, LED, Acrílico, etc.
+  unit: varchar("unit", { length: 30 }).notNull(), // m2, ml, un, chapa, barra, litro
+  costPriceCents: integer("cost_price_cents").notNull(), // custo em centavos
+  supplierId: uuid("supplier_id").references(() => suppliers.id),
+  notes: text("notes"),
+  active: boolean("active").default(true).notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// SERVIÇOS E CUSTOS AUXILIARES
+export const auxiliaryServices = pgTable("auxiliary_services", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  category: varchar("category", { length: 100 }).notNull(), // MaoDeObra, Instalacao, Deslocamento, Equipamento, Terceirizado
+  unit: varchar("unit", { length: 30 }).notNull(), // hora, dia, km, un, diaria
+  costPriceCents: integer("cost_price_cents").notNull(),
+  defaultPriceCents: integer("default_price_cents").notNull(),
+  notes: text("notes"),
+  active: boolean("active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// MODELOS DE PRODUTOS (Fachada ACM, Banner, Totem, etc)
+export const productTemplates = pgTable("product_templates", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  commercialUnit: varchar("commercial_unit", { length: 30 }).default("m2").notNull(),
+  description: text("description"),
+  defaultMarkupPercent: numeric("default_markup_percent", { precision: 5, scale: 2 }).default("50.00").notNull(),
+  defaultLossPercent: numeric("default_loss_percent", { precision: 5, scale: 2 }).default("10.00").notNull(),
+  defaultComponents: jsonb("default_components"), // Array com sugestão de materiais e serviços
+  active: boolean("active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// ORÇAMENTOS
+export const quotes = pgTable("quotes", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  code: varchar("code", { length: 50 }).notNull().unique(), // ex: ORC-2026-001
+  revision: integer("revision").default(1).notNull(),
+  clientId: uuid("client_id").references(() => clients.id).notNull(),
+  userId: uuid("user_id").references(() => users.id),
+  status: varchar("status", { length: 50 }).default("rascunho").notNull(), // rascunho, enviado, negociacao, aprovado, recusado, cancelado
+  issueDate: timestamp("issue_date").defaultNow().notNull(),
+  validUntil: timestamp("valid_until").notNull(),
+  paymentConditions: text("payment_conditions"),
+  deliveryTimeDays: integer("delivery_time_days").default(15),
+  commercialNotes: text("commercial_notes"),
+  internalNotes: text("internal_notes"),
+  subtotalCents: integer("subtotal_cents").default(0).notNull(),
+  discountCents: integer("discount_cents").default(0).notNull(),
+  totalCents: integer("total_cents").default(0).notNull(),
+  estimatedCostCents: integer("estimated_cost_cents").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// ITENS DO ORÇAMENTO (Com preservação histórica / snapshot)
+export const quoteItems = pgTable("quote_items", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  quoteId: uuid("quote_id").references(() => quotes.id).notNull(),
+  productName: varchar("product_name", { length: 255 }).notNull(),
+  description: text("description"),
+  quantity: integer("quantity").default(1).notNull(),
+  widthMeters: numeric("width_meters", { precision: 8, scale: 3 }),
+  heightMeters: numeric("height_meters", { precision: 8, scale: 3 }),
+  unitArea: numeric("unit_area", { precision: 8, scale: 3 }),
+  totalArea: numeric("total_area", { precision: 8, scale: 3 }),
+  pricingMethod: varchar("pricing_method", { length: 50 }).default("composicao").notNull(), // composicao, m2, ml, unidade, manual
+  costSnapshot: jsonb("cost_snapshot"), // Snapshot completo dos custos de materiais, perdas e servicos
+  unitCostCents: integer("unit_cost_cents").default(0).notNull(),
+  totalCostCents: integer("total_cost_cents").default(0).notNull(),
+  unitPriceCents: integer("unit_price_cents").default(0).notNull(),
+  totalPriceCents: integer("total_price_cents").default(0).notNull(),
+  notes: text("notes"),
+});
+
+// ORDENS DE SERVIÇO
+export const workOrders = pgTable("work_orders", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  code: varchar("code", { length: 50 }).notNull().unique(), // ex: OS-2026-001
+  quoteId: uuid("quote_id").references(() => quotes.id).unique(),
+  clientId: uuid("client_id").references(() => clients.id).notNull(),
+  assignedUserId: uuid("assigned_user_id").references(() => users.id),
+  status: varchar("status", { length: 50 }).default("aguardando_inicio").notNull(), // aguardando_inicio, em_producao, aguardando_material, pronto_instalacao, em_instalacao, concluido, cancelado
+  priority: varchar("priority", { length: 20 }).default("normal").notNull(), // baixa, normal, alta, urgente
+  installationAddress: text("installation_address"),
+  expectedStartDate: timestamp("expected_start_date"),
+  expectedDeliveryDate: timestamp("expected_delivery_date"),
+  completedAt: timestamp("completed_at"),
+  productionNotes: text("production_notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// HISTÓRICO DE ETAPAS DA ORDEM DE SERVIÇO
+export const workOrderHistory = pgTable("work_order_history", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  workOrderId: uuid("work_order_id").references(() => workOrders.id).notNull(),
+  previousStatus: varchar("previous_status", { length: 50 }),
+  newStatus: varchar("new_status", { length: 50 }).notNull(),
+  notes: text("notes"),
+  userId: uuid("user_id").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// CONTAS A RECEBER
+export const accountsReceivable = pgTable("accounts_receivable", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  clientId: uuid("client_id").references(() => clients.id).notNull(),
+  quoteId: uuid("quote_id").references(() => quotes.id),
+  workOrderId: uuid("work_order_id").references(() => workOrders.id),
+  description: text("description").notNull(),
+  installmentNumber: integer("installment_number").default(1).notNull(),
+  totalInstallments: integer("total_installments").default(1).notNull(),
+  amountCents: integer("amount_cents").notNull(),
+  paidAmountCents: integer("paid_amount_cents").default(0).notNull(),
+  balanceCents: integer("balance_cents").notNull(),
+  dueDate: timestamp("due_date").notNull(),
+  status: varchar("status", { length: 30 }).default("pendente").notNull(), // pendente, pago_parcial, pago, cancelado
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// RECEBIMENTOS EFETIVADOS
+export const paymentsReceived = pgTable("payments_received", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  receivableId: uuid("receivable_id").references(() => accountsReceivable.id).notNull(),
+  amountCents: integer("amount_cents").notNull(),
+  paymentDate: timestamp("payment_date").defaultNow().notNull(),
+  paymentMethod: varchar("payment_method", { length: 50 }).notNull(), // pix, boleto, cartao, transferencia, dinheiro
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// CONTAS A PAGAR
+export const accountsPayable = pgTable("accounts_payable", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  supplierId: uuid("supplier_id").references(() => suppliers.id),
+  beneficiaryName: varchar("beneficiary_name", { length: 255 }).notNull(),
+  workOrderId: uuid("work_order_id").references(() => workOrders.id),
+  category: varchar("category", { length: 100 }).notNull(), // material, mao_de_obra, frete, equipamento, fixo
+  description: text("description").notNull(),
+  amountCents: integer("amount_cents").notNull(),
+  paidAmountCents: integer("paid_amount_cents").default(0).notNull(),
+  balanceCents: integer("balance_cents").notNull(),
+  dueDate: timestamp("due_date").notNull(),
+  status: varchar("status", { length: 30 }).default("pendente").notNull(), // pendente, pago, cancelado
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// CONFIGURAÇÕES DA EMPRESA
+export const companySettings = pgTable("company_settings", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  companyName: varchar("company_name", { length: 255 }).default("GM Sign Solutions").notNull(),
+  tradeName: varchar("trade_name", { length: 255 }).default("GM Sign"),
+  cnpj: varchar("cnpj", { length: 30 }),
+  phone: varchar("phone", { length: 50 }),
+  email: varchar("email", { length: 255 }),
+  address: text("address"),
+  defaultQuoteValidityDays: integer("default_quote_validity_days").default(10).notNull(),
+  defaultPaymentTerms: text("default_payment_terms").default("50% de entrada e o restante na entrega."),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
