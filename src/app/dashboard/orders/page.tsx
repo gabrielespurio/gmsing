@@ -14,6 +14,7 @@ import {
   Package,
   CreditCard,
   DollarSign,
+  Plus,
 } from "lucide-react";
 import { updateOrderStatusAction } from "@/domains/quotes/actions";
 
@@ -48,6 +49,7 @@ export default async function OrdersPage() {
     .select({
       id: orders.id,
       code: orders.code,
+      title: orders.title,
       status: orders.status,
       priority: orders.priority,
       paymentMethod: orders.paymentMethod,
@@ -64,8 +66,8 @@ export default async function OrdersPage() {
       clientPhone: clients.phone,
     })
     .from(orders)
-    .innerJoin(quotes, eq(orders.quoteId, quotes.id))
     .innerJoin(clients, eq(orders.clientId, clients.id))
+    .leftJoin(quotes, eq(orders.quoteId, quotes.id))
     .orderBy(desc(orders.createdAt));
 
   const totalOrders = orderList.length;
@@ -82,17 +84,26 @@ export default async function OrdersPage() {
             Pedidos de Venda & Produção
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            Acompanhe pedidos aprovados, alocação de estoque, prazos e faturamento financeiro.
+            Crie pedidos diretos ou acompanhe orçamentos convertidos com baixa de estoque e financeiro.
           </p>
         </div>
 
-        <Link
-          href="/dashboard/quotes"
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#14274B] hover:bg-[#0B1730] text-white text-sm font-semibold transition-colors shadow-2xs"
-        >
-          <span>Aprovar Mais Orçamentos</span>
-          <ArrowRight className="w-4 h-4 text-[#E3B48A]" />
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/dashboard/orders/new"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[#B87A52] hover:bg-[#a66a43] text-white text-sm font-semibold transition-colors shadow-sm"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Novo Pedido Direto</span>
+          </Link>
+          <Link
+            href="/dashboard/quotes"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[#14274B] hover:bg-[#0B1730] text-white text-sm font-semibold transition-colors shadow-2xs"
+          >
+            <span>Ver Orçamentos</span>
+            <ArrowRight className="w-4 h-4 text-[#E3B48A]" />
+          </Link>
+        </div>
       </div>
 
       {/* KPI Cards */}
@@ -190,12 +201,21 @@ export default async function OrdersPage() {
                     <tr key={order.id} className="hover:bg-slate-50/60 transition-colors">
                       <td className="px-6 py-4">
                         <div className="font-mono font-bold text-[#14274B]">{order.code}</div>
-                        <Link
-                          href={`/dashboard/quotes/${order.quoteId}`}
-                          className="text-xs text-slate-400 hover:text-[#B87A52] flex items-center gap-1 mt-0.5"
-                        >
-                          Origem: {order.quoteCode}
-                        </Link>
+                        {order.title && (
+                          <div className="text-xs font-medium text-slate-800 truncate max-w-xs">{order.title}</div>
+                        )}
+                        {order.quoteId ? (
+                          <Link
+                            href={`/dashboard/quotes/${order.quoteId}`}
+                            className="text-[11px] text-[#B87A52] hover:underline flex items-center gap-1 mt-0.5"
+                          >
+                            Origem: {order.quoteCode}
+                          </Link>
+                        ) : (
+                          <span className="inline-block mt-1 text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">
+                            Venda Direta
+                          </span>
+                        )}
                       </td>
 
                       <td className="px-6 py-4">

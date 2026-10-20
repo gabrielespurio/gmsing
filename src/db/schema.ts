@@ -157,7 +157,8 @@ export const quoteItems = pgTable("quote_items", {
 export const orders = pgTable("orders", {
   id: uuid("id").defaultRandom().primaryKey(),
   code: varchar("code", { length: 50 }).notNull().unique(), // ex: PED-2026-001
-  quoteId: uuid("quote_id").references(() => quotes.id).notNull().unique(),
+  title: varchar("title", { length: 255 }),
+  quoteId: uuid("quote_id").references(() => quotes.id),
   clientId: uuid("client_id").references(() => clients.id).notNull(),
   assignedUserId: uuid("assigned_user_id").references(() => users.id),
   status: varchar("status", { length: 50 }).default("pendente_pagamento").notNull(), 

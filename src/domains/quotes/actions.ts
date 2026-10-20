@@ -180,10 +180,12 @@ export async function convertQuoteToOrderAction(formData: FormData) {
   const firstDueDate = firstDueDateStr ? new Date(firstDueDateStr) : new Date();
 
   // Insere Pedido
+  const orderTitle = items.length > 0 ? items.map((i) => i.productName).join(" + ") : `Orçamento ${quote.code}`;
   const [newOrder] = await db
     .insert(orders)
     .values({
       code: orderCode,
+      title: orderTitle,
       quoteId: quote.id,
       clientId: quote.clientId,
       status: "em_producao",
@@ -344,4 +346,129 @@ export async function receivePaymentAction(receivableId: string, paymentMethod =
 
   revalidatePath("/dashboard/financial");
   revalidatePath("/dashboard");
+}
+
+/**
+ * CRIAÇÃO DIRETA: Pedido criado diretamente sem vínculo obrigatório com Orçamento
+ * - Cria Pedido ('orders') com título/descrição, cliente, valor, pagamento e prazo
+ * - Gera parcelas no Contas a Receber ('accounts_receivable')
+ * - Opcionalmente deduz matéria-prima do estoque ('stock_movements')
+ */
+export async function createDirectOrderAction(formData: FormData) {
+  const clientId = formData.get("clientId") as string;
+  const title = (formData.get("title") as string) || "Pedido Direto";
+  const totalAmountStr = (formData.get("totalAmount") as string) || "0";
+  const paymentMethod = (formData.get("paymentMethod") as string) || "pix";
+  const installmentsCount = parseInt((formData.get("installmentsCount") as string) || "1", 10);
+  const firstDueDateStr = formData.get("firstDueDate") as string;
+  const installationAddress = (formData.get("installationAddress") as string) || "";
+  const expectedDeliveryDateStr = formData.get("expectedDeliveryDate") as string;
+  const productionNotes = (formData.get("productionNotes") as string) || "";
+  const materialId = formData.get("materialId") as string;
+  const materialQuantity = parseFloat((formData.get("materialQuantity") as string) || "0");
+
+  if (!clientId) {
+    throw new Error("Cliente é obrigatório para gerar o pedido.");
+  }
+
+  // Converte valor em reais (ex: 1500 ou 1.500,00) para centavos
+  const cleanedValue = totalAmountStr.replace(/\./g, "").replace(",", ".");
+  const totalAmountCents = Math.round(parseFloat(cleanedValue || "0") * 100);
+
+  if (totalAmountCents <= 0) {
+    throw new Error("O valor total do pedido deve ser maior que zero.");
+  }
+
+  const currentYear = new Date().getFullYear();
+  const allOrders = await db.select({ code: orders.code }).from(orders);
+  const nextSeq = allOrders.length + 1;
+  const orderCode = `PED-${currentYear}-${String(nextSeq).padStart(3, "0")}`;
+
+  const expectedDeliveryDate = expectedDeliveryDateStr
+    ? new Date(expectedDeliveryDateStr)
+    : new Date(Date.now() + 15 * 86400000);
+  const firstDueDate = firstDueDateStr ? new Date(firstDueDateStr) : new Date();
+
+  const stockDeducted = Boolean(materialId && materialQuantity > 0);
+
+  const [newOrder] = await db
+    .insert(orders)
+    .values({
+      code: orderCode,
+      title,
+      quoteId: null,
+      clientId,
+      status: "em_producao",
+      priority: "normal",
+      paymentMethod,
+      paymentTerms: `${installmentsCount}x via ${paymentMethod.toUpperCase()}`,
+      installmentsCount,
+      totalAmountCents,
+      stockDeducted,
+      installationAddress,
+      expectedStartDate: new Date(),
+      expectedDeliveryDate,
+      productionNotes,
+    })
+    .returning();
+
+  await db.insert(orderHistory).values({
+    orderId: newOrder.id,
+    previousStatus: null,
+    newStatus: "em_producao",
+    notes: `Pedido criado diretamente: ${title}.`,
+  });
+
+  // INTEGRAÇÃO FINANCEIRA: Gera Contas a Receber divididas em parcelas
+  const baseInstallmentAmount = Math.floor(totalAmountCents / installmentsCount);
+  const remainder = totalAmountCents % installmentsCount;
+
+  for (let i = 1; i <= installmentsCount; i++) {
+    const installmentAmount = i === 1 ? baseInstallmentAmount + remainder : baseInstallmentAmount;
+    const installmentDueDate = new Date(firstDueDate);
+    installmentDueDate.setDate(installmentDueDate.getDate() + (i - 1) * 30);
+
+    await db.insert(accountsReceivable).values({
+      clientId,
+      quoteId: null,
+      orderId: newOrder.id,
+      description: `Parcela ${i}/${installmentsCount} - ${title} (${newOrder.code})`,
+      installmentNumber: i,
+      totalInstallments: installmentsCount,
+      amountCents: installmentAmount,
+      paidAmountCents: 0,
+      balanceCents: installmentAmount,
+      dueDate: installmentDueDate,
+      paymentMethod,
+      status: "pendente",
+    });
+  }
+
+  // INTEGRAÇÃO COM ESTOQUE (Se especificado material consumido)
+  if (materialId && materialQuantity > 0) {
+    const [mat] = await db.select().from(materials).where(eq(materials.id, materialId)).limit(1);
+    if (mat) {
+      await db.insert(stockMovements).values({
+        materialId: mat.id,
+        orderId: newOrder.id,
+        type: "saida",
+        quantity: String(materialQuantity),
+        unitCostCents: mat.costPriceCents,
+        reason: `Baixa de estoque por Pedido Direto ${newOrder.code} (${title})`,
+      });
+
+      const newStock = Math.max(0, Number(mat.currentStock) - materialQuantity);
+      await db
+        .update(materials)
+        .set({ currentStock: String(newStock), updatedAt: new Date() })
+        .where(eq(materials.id, mat.id));
+    }
+  }
+
+  revalidatePath("/dashboard/orders");
+  revalidatePath("/dashboard/financial");
+  revalidatePath("/dashboard/stock");
+  revalidatePath("/dashboard");
+
+  redirect("/dashboard/orders");
 }
