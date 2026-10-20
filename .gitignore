@@ -18,6 +18,8 @@
 .next/
 /.next/
 /out/
+*next.config.*
+!next.config.ts
 
 # production
 /build
