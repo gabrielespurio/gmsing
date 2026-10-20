@@ -1,4 +1,4 @@
-﻿import {
+import {
   pgTable,
   text,
   timestamp,
@@ -57,17 +57,31 @@ export const suppliers = pgTable("suppliers", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-// MATERIAIS
+// MATERIAIS / ESTOQUE
 export const materials = pgTable("materials", {
   id: uuid("id").defaultRandom().primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
   category: varchar("category", { length: 100 }).notNull(), // ACM, Lona, Vinil, Metalon, LED, Acrílico, etc.
   unit: varchar("unit", { length: 30 }).notNull(), // m2, ml, un, chapa, barra, litro
   costPriceCents: integer("cost_price_cents").notNull(), // custo em centavos
+  currentStock: numeric("current_stock", { precision: 12, scale: 2 }).default("0").notNull(),
+  minStock: numeric("min_stock", { precision: 12, scale: 2 }).default("5").notNull(),
   supplierId: uuid("supplier_id").references(() => suppliers.id),
   notes: text("notes"),
   active: boolean("active").default(true).notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// MOVIMENTAÇÕES DE ESTOQUE
+export const stockMovements = pgTable("stock_movements", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  materialId: uuid("material_id").references(() => materials.id).notNull(),
+  orderId: uuid("order_id"), // Referência ao pedido que consumiu
+  type: varchar("type", { length: 20 }).notNull(), // 'entrada', 'saida', 'ajuste'
+  quantity: numeric("quantity", { precision: 12, scale: 2 }).notNull(),
+  unitCostCents: integer("unit_cost_cents").default(0).notNull(),
+  reason: text("reason").notNull(), // Ex: "Consumo Orçamento ORC-2026-001 -> Pedido PED-2026-001"
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -139,15 +153,21 @@ export const quoteItems = pgTable("quote_items", {
   notes: text("notes"),
 });
 
-// ORDENS DE SERVIÇO
-export const workOrders = pgTable("work_orders", {
+// PEDIDOS (Substitui Ordens de Serviço com foco comercial/produção/financeiro/estoque)
+export const orders = pgTable("orders", {
   id: uuid("id").defaultRandom().primaryKey(),
-  code: varchar("code", { length: 50 }).notNull().unique(), // ex: OS-2026-001
-  quoteId: uuid("quote_id").references(() => quotes.id).unique(),
+  code: varchar("code", { length: 50 }).notNull().unique(), // ex: PED-2026-001
+  quoteId: uuid("quote_id").references(() => quotes.id).notNull().unique(),
   clientId: uuid("client_id").references(() => clients.id).notNull(),
   assignedUserId: uuid("assigned_user_id").references(() => users.id),
-  status: varchar("status", { length: 50 }).default("aguardando_inicio").notNull(), // aguardando_inicio, em_producao, aguardando_material, pronto_instalacao, em_instalacao, concluido, cancelado
+  status: varchar("status", { length: 50 }).default("pendente_pagamento").notNull(), 
+  // pendente_pagamento, aguardando_material, em_producao, pronto_instalacao, em_instalacao, concluido, cancelado
   priority: varchar("priority", { length: 20 }).default("normal").notNull(), // baixa, normal, alta, urgente
+  paymentMethod: varchar("payment_method", { length: 50 }).default("pix").notNull(), // pix, boleto, cartao_credito, transferencia, dinheiro, faturado
+  paymentTerms: text("payment_terms"), // ex: "50% de entrada + 50% na instalação (2x)"
+  installmentsCount: integer("installments_count").default(1).notNull(),
+  totalAmountCents: integer("total_amount_cents").default(0).notNull(),
+  stockDeducted: boolean("stock_deducted").default(false).notNull(),
   installationAddress: text("installation_address"),
   expectedStartDate: timestamp("expected_start_date"),
   expectedDeliveryDate: timestamp("expected_delivery_date"),
@@ -157,10 +177,10 @@ export const workOrders = pgTable("work_orders", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-// HISTÓRICO DE ETAPAS DA ORDEM DE SERVIÇO
-export const workOrderHistory = pgTable("work_order_history", {
+// HISTÓRICO DO PEDIDO
+export const orderHistory = pgTable("order_history", {
   id: uuid("id").defaultRandom().primaryKey(),
-  workOrderId: uuid("work_order_id").references(() => workOrders.id).notNull(),
+  orderId: uuid("order_id").references(() => orders.id).notNull(),
   previousStatus: varchar("previous_status", { length: 50 }),
   newStatus: varchar("new_status", { length: 50 }).notNull(),
   notes: text("notes"),
@@ -168,12 +188,12 @@ export const workOrderHistory = pgTable("work_order_history", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-// CONTAS A RECEBER
+// CONTAS A RECEBER (Vinculado ao Pedido e Orçamento)
 export const accountsReceivable = pgTable("accounts_receivable", {
   id: uuid("id").defaultRandom().primaryKey(),
   clientId: uuid("client_id").references(() => clients.id).notNull(),
   quoteId: uuid("quote_id").references(() => quotes.id),
-  workOrderId: uuid("work_order_id").references(() => workOrders.id),
+  orderId: uuid("order_id").references(() => orders.id),
   description: text("description").notNull(),
   installmentNumber: integer("installment_number").default(1).notNull(),
   totalInstallments: integer("total_installments").default(1).notNull(),
@@ -181,6 +201,7 @@ export const accountsReceivable = pgTable("accounts_receivable", {
   paidAmountCents: integer("paid_amount_cents").default(0).notNull(),
   balanceCents: integer("balance_cents").notNull(),
   dueDate: timestamp("due_date").notNull(),
+  paymentMethod: varchar("payment_method", { length: 50 }).default("pix").notNull(),
   status: varchar("status", { length: 30 }).default("pendente").notNull(), // pendente, pago_parcial, pago, cancelado
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -201,7 +222,7 @@ export const accountsPayable = pgTable("accounts_payable", {
   id: uuid("id").defaultRandom().primaryKey(),
   supplierId: uuid("supplier_id").references(() => suppliers.id),
   beneficiaryName: varchar("beneficiary_name", { length: 255 }).notNull(),
-  workOrderId: uuid("work_order_id").references(() => workOrders.id),
+  orderId: uuid("order_id").references(() => orders.id),
   category: varchar("category", { length: 100 }).notNull(), // material, mao_de_obra, frete, equipamento, fixo
   description: text("description").notNull(),
   amountCents: integer("amount_cents").notNull(),
