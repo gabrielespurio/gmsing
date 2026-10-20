@@ -3,7 +3,6 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "prebuild": "node -e \"const fs = require('fs'); fs.readdirSync('.').forEach(f => { if ((f.endsWith('.next.config.ts') || f.endsWith('.next.config.js') || f.endsWith('.next.config.mjs')) && f !== 'next.config.ts' && f !== 'next.config.js' && f !== 'next.config.mjs') { try { fs.unlinkSync(f); console.log('Removed stray config:', f); } catch(e){} } });\"",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
