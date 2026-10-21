@@ -57,6 +57,27 @@ export const suppliers = pgTable("suppliers", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// CATEGORIAS DE MATERIAIS
+export const materialCategories = pgTable("material_categories", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: varchar("name", { length: 100 }).notNull().unique(),
+  description: text("description"),
+  active: boolean("active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// UNIDADES DE MEDIDA
+export const measurementUnits = pgTable("measurement_units", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  code: varchar("code", { length: 30 }).notNull().unique(),
+  name: varchar("name", { length: 100 }).notNull(),
+  description: text("description"),
+  active: boolean("active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // MATERIAIS / ESTOQUE
 export const materials = pgTable("materials", {
   id: uuid("id").defaultRandom().primaryKey(),

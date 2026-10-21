@@ -10,6 +10,7 @@ import {
   PackageCheck,
   Users,
   DollarSign,
+  Settings,
   LogOut,
   ShieldAlert,
 } from "lucide-react";
@@ -66,6 +67,12 @@ export function Sidebar({ user }: SidebarProps) {
       icon: DollarSign,
       active: pathname.startsWith("/dashboard/financial"),
       badge: "Receber",
+    },
+    {
+      label: "Configurações",
+      href: "/dashboard/settings",
+      icon: Settings,
+      active: pathname.startsWith("/dashboard/settings"),
     },
   ];
 
