@@ -17,6 +17,7 @@ import {
   ArrowRight,
   Package,
   Calculator,
+  HelpCircle,
 } from "lucide-react";
 import {
   createProductAction,
@@ -554,11 +555,12 @@ export function ProductManager({
 
       {/* Modal de Criação / Edição com Ficha Técnica */}
       {modalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-3xl w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150 my-8">
-            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-hidden">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-3xl w-full max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            {/* Modal Header Fixo */}
+            <div className="shrink-0 px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-[#0B1730] text-[#E3B48A] flex items-center justify-center">
+                <div className="w-8 h-8 rounded-lg bg-[#0B1730] text-[#E3B48A] flex items-center justify-center shrink-0">
                   {formType === "servico" ? <Wrench className="w-4 h-4" /> : <Boxes className="w-4 h-4" />}
                 </div>
                 <div>
@@ -598,45 +600,47 @@ export function ProductManager({
                   setIsSubmitting(false);
                 }
               }}
-              className="p-6 space-y-6"
+              className="flex-1 flex flex-col min-h-0 overflow-hidden"
             >
-              {/* Seletor Produto vs Serviço (apenas se novo) */}
-              {!editingProduct && (
-                <div className="flex items-center gap-3 p-1.5 bg-slate-100 rounded-xl">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFormType("produto");
-                      setFormUnit("m2");
-                      setFormCode(`PRD-${Date.now().toString().slice(-4)}`);
-                    }}
-                    className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                      formType === "produto"
-                        ? "bg-[#0B1730] text-white shadow-xs"
-                        : "text-slate-600 hover:text-slate-900"
-                    }`}
-                  >
-                    <Boxes className="w-4 h-4 text-[#E3B48A]" />
-                    <span>Produto Fabricado (com materiais)</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFormType("servico");
-                      setFormUnit("hora");
-                      setFormCode(`SRV-${Date.now().toString().slice(-4)}`);
-                    }}
-                    className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                      formType === "servico"
-                        ? "bg-[#0B1730] text-white shadow-xs"
-                        : "text-slate-600 hover:text-slate-900"
-                    }`}
-                  >
-                    <Wrench className="w-4 h-4 text-[#E3B48A]" />
-                    <span>Serviço Técnico / Mão de Obra</span>
-                  </button>
-                </div>
-              )}
+              {/* Corpo com Scroll Suave */}
+              <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
+                {/* Seletor Produto vs Serviço (apenas se novo) */}
+                {!editingProduct && (
+                  <div className="flex items-center gap-3 p-1.5 bg-slate-100 rounded-xl">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormType("produto");
+                        setFormUnit("m2");
+                        setFormCode(`PRD-${Date.now().toString().slice(-4)}`);
+                      }}
+                      className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        formType === "produto"
+                          ? "bg-[#0B1730] text-white shadow-xs"
+                          : "text-slate-600 hover:text-slate-900"
+                      }`}
+                    >
+                      <Boxes className="w-4 h-4 text-[#E3B48A]" />
+                      <span>Produto Fabricado (com materiais)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormType("servico");
+                        setFormUnit("hora");
+                        setFormCode(`SRV-${Date.now().toString().slice(-4)}`);
+                      }}
+                      className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        formType === "servico"
+                          ? "bg-[#0B1730] text-white shadow-xs"
+                          : "text-slate-600 hover:text-slate-900"
+                      }`}
+                    >
+                      <Wrench className="w-4 h-4 text-[#E3B48A]" />
+                      <span>Serviço Técnico / Mão de Obra</span>
+                    </button>
+                  </div>
+                )}
 
               {/* Informações Básicas */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -702,9 +706,17 @@ export function ProductManager({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                    Margem / Markup Padrão (%)
-                  </label>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                      Margem / Markup Padrão (%)
+                    </label>
+                    <div
+                      className="group relative inline-flex cursor-help"
+                      title="Markup é a porcentagem calculada sobre o custo para obter o preço de venda. Fórmula: Preço = Custo × (1 + Markup%). Ex: R$ 100 de custo com 60% de markup = R$ 160 de venda."
+                    >
+                      <HelpCircle className="w-3.5 h-3.5 text-slate-400 group-hover:text-[#B87A52] transition-colors" />
+                    </div>
+                  </div>
                   <input
                     type="number"
                     step="0.01"
@@ -718,8 +730,12 @@ export function ProductManager({
                         setFormSalePrice((cost * (1 + mkp / 100)).toFixed(2).replace(".", ","));
                       }
                     }}
+                    placeholder="Ex: 60"
                     className="w-full h-9 px-3 bg-white border border-slate-300 rounded-lg text-sm text-slate-800 font-mono focus:outline-none focus:ring-2 focus:ring-[#B87A52]/40"
                   />
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Calcula Preço = Custo × (1 + Markup%)
+                  </p>
                 </div>
 
                 <div>
@@ -882,13 +898,14 @@ export function ProductManager({
                   )}
                 </div>
               )}
+              </div>
 
-              {/* Botões do Modal */}
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
+              {/* Botões do Modal Fixos no Rodapé */}
+              <div className="shrink-0 px-6 py-3.5 border-t border-slate-200 bg-slate-50 flex items-center justify-end gap-3">
                 <button
                   type="button"
                   onClick={handleCloseModal}
-                  className="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+                  className="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-200 transition-colors cursor-pointer"
                 >
                   Cancelar
                 </button>
