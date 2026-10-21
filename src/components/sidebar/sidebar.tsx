@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   FileText,
   ShoppingBag,
+  Boxes,
   PackageCheck,
   Users,
   DollarSign,
@@ -48,6 +49,13 @@ export function Sidebar({ user }: SidebarProps) {
       icon: ShoppingBag,
       active: pathname.startsWith("/dashboard/orders"),
       badge: "Produção",
+    },
+    {
+      label: "Produtos & Serviços",
+      href: "/dashboard/products",
+      icon: Boxes,
+      active: pathname.startsWith("/dashboard/products"),
+      badge: "Catálogo",
     },
     {
       label: "Estoque & Materiais",

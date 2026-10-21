@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Trash2, Calculator, Info, Check, Save } from "lucide-react";
+import { Plus, Trash2, Calculator, Info, Check, Save, Boxes } from "lucide-react";
 import { createQuoteAction, ItemPayload } from "@/domains/quotes/actions";
 
 interface ClientOption {
@@ -19,12 +19,26 @@ interface MaterialOption {
   costPriceCents: number;
 }
 
+export interface ProductOption {
+  id: string;
+  code: string;
+  name: string;
+  type: string;
+  category: string;
+  unit: string;
+  salePriceCents: number;
+  costPriceCents: number;
+  markupPercent: string;
+  description: string | null;
+}
+
 interface QuoteFormProps {
   clients: ClientOption[];
   materials: MaterialOption[];
+  products?: ProductOption[];
 }
 
-export function QuoteForm({ clients, materials }: QuoteFormProps) {
+export function QuoteForm({ clients, materials, products = [] }: QuoteFormProps) {
   const [selectedClient, setSelectedClient] = useState(clients[0]?.id || "");
   const [validityDays, setValidityDays] = useState("10");
   const [deliveryTimeDays, setDeliveryTimeDays] = useState("15");
@@ -33,6 +47,7 @@ export function QuoteForm({ clients, materials }: QuoteFormProps) {
   const [internalNotes, setInternalNotes] = useState("");
 
   // Estado para adicionar item
+  const [selectedCatalogId, setSelectedCatalogId] = useState("");
   const [productName, setProductName] = useState("Fachada ACM com Letras Caixa LED");
   const [quantity, setQuantity] = useState("1");
   const [widthMeters, setWidthMeters] = useState("6.00");
@@ -40,6 +55,25 @@ export function QuoteForm({ clients, materials }: QuoteFormProps) {
   const [selectedMaterialId, setSelectedMaterialId] = useState(materials[0]?.id || "");
   const [markupPercent, setMarkupPercent] = useState("60");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleCatalogSelect = (prodId: string) => {
+    setSelectedCatalogId(prodId);
+    if (!prodId) return;
+    const prod = products.find((p) => p.id === prodId);
+    if (prod) {
+      setProductName(prod.name);
+      if (prod.markupPercent) {
+        setMarkupPercent(prod.markupPercent);
+      }
+      if (prod.unit === "un" || prod.unit === "hora" || prod.unit === "diaria") {
+        setWidthMeters("");
+        setHeightMeters("");
+      } else if (prod.unit === "m2" && (!widthMeters || !heightMeters)) {
+        setWidthMeters("2.00");
+        setHeightMeters("1.00");
+      }
+    }
+  };
 
   // Lista de itens do orçamento
   const [items, setItems] = useState<ItemPayload[]>([
@@ -208,6 +242,28 @@ export function QuoteForm({ clients, materials }: QuoteFormProps) {
             Área, materiais e margem calculados em tempo real
           </span>
         </h2>
+
+        {/* Seletor Rápido de Catálogo de Produtos & Serviços */}
+        {products.length > 0 && (
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 p-3 bg-white rounded-lg border border-slate-200 shadow-2xs">
+            <span className="text-xs font-bold text-[#0B1730] flex items-center gap-1.5 shrink-0">
+              <Boxes className="w-4 h-4 text-[#B87A52]" />
+              <span>Carregar do Catálogo:</span>
+            </span>
+            <select
+              value={selectedCatalogId}
+              onChange={(e) => handleCatalogSelect(e.target.value)}
+              className="flex-1 h-9 px-3 bg-slate-50 border border-slate-300 rounded-lg text-xs text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-[#B87A52]/40"
+            >
+              <option value="">-- Selecionar Produto ou Serviço Pré-Cadastrado --</option>
+              {products.map((p) => (
+                <option key={p.id} value={p.id}>
+                  [{p.code}] {p.name} ({p.category}) - {formatBRL(p.salePriceCents)} / {p.unit}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {/* Linha de configuração do novo item */}
         <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-4">

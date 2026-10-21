@@ -1,35 +1,54 @@
 export const instant = false;
 
 import { db } from "@/db";
-import { clients, materials } from "@/db/schema";
+import { clients, materials, productsServices } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { QuoteForm } from "./quote-form";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
 export default async function NewQuotePage() {
-  const clientList = await db
-    .select({
-      id: clients.id,
-      name: clients.name,
-      tradeName: clients.tradeName,
-      document: clients.document,
-    })
-    .from(clients)
-    .where(eq(clients.active, true))
-    .orderBy(clients.name);
+  const [clientList, materialList, productList] = await Promise.all([
+    db
+      .select({
+        id: clients.id,
+        name: clients.name,
+        tradeName: clients.tradeName,
+        document: clients.document,
+      })
+      .from(clients)
+      .where(eq(clients.active, true))
+      .orderBy(clients.name),
 
-  const materialList = await db
-    .select({
-      id: materials.id,
-      name: materials.name,
-      category: materials.category,
-      unit: materials.unit,
-      costPriceCents: materials.costPriceCents,
-    })
-    .from(materials)
-    .where(eq(materials.active, true))
-    .orderBy(materials.name);
+    db
+      .select({
+        id: materials.id,
+        name: materials.name,
+        category: materials.category,
+        unit: materials.unit,
+        costPriceCents: materials.costPriceCents,
+      })
+      .from(materials)
+      .where(eq(materials.active, true))
+      .orderBy(materials.name),
+
+    db
+      .select({
+        id: productsServices.id,
+        code: productsServices.code,
+        name: productsServices.name,
+        type: productsServices.type,
+        category: productsServices.category,
+        unit: productsServices.unit,
+        salePriceCents: productsServices.salePriceCents,
+        costPriceCents: productsServices.costPriceCents,
+        markupPercent: productsServices.markupPercent,
+        description: productsServices.description,
+      })
+      .from(productsServices)
+      .where(eq(productsServices.active, true))
+      .orderBy(productsServices.name),
+  ]);
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
@@ -50,7 +69,7 @@ export default async function NewQuotePage() {
         </div>
       </div>
 
-      <QuoteForm clients={clientList} materials={materialList} />
+      <QuoteForm clients={clientList} materials={materialList} products={productList} />
     </div>
   );
 }

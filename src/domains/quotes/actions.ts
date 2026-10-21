@@ -10,6 +10,7 @@ import {
   paymentsReceived,
   stockMovements,
   materials,
+  productComponents,
 } from "@/db/schema";
 import { eq, desc, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
@@ -366,6 +367,8 @@ export async function createDirectOrderAction(formData: FormData) {
   const productionNotes = (formData.get("productionNotes") as string) || "";
   const materialId = formData.get("materialId") as string;
   const materialQuantity = parseFloat((formData.get("materialQuantity") as string) || "0");
+  const productId = formData.get("productId") as string;
+  const productQuantity = parseFloat((formData.get("productQuantity") as string) || "1");
 
   if (!clientId) {
     throw new Error("Cliente é obrigatório para gerar o pedido.");
@@ -389,7 +392,18 @@ export async function createDirectOrderAction(formData: FormData) {
     : new Date(Date.now() + 15 * 86400000);
   const firstDueDate = firstDueDateStr ? new Date(firstDueDateStr) : new Date();
 
-  const stockDeducted = Boolean(materialId && materialQuantity > 0);
+  // Buscar componentes de estoque do produto se selecionado
+  const productComps = productId
+    ? await db
+        .select({
+          materialId: productComponents.materialId,
+          quantityPerUnit: productComponents.quantityPerUnit,
+        })
+        .from(productComponents)
+        .where(eq(productComponents.productId, productId))
+    : [];
+
+  const stockDeducted = Boolean(productComps.length > 0 || (materialId && materialQuantity > 0));
 
   const [newOrder] = await db
     .insert(orders)
@@ -444,8 +458,29 @@ export async function createDirectOrderAction(formData: FormData) {
     });
   }
 
-  // INTEGRAÇÃO COM ESTOQUE (Se especificado material consumido)
-  if (materialId && materialQuantity > 0) {
+  // INTEGRAÇÃO COM ESTOQUE: Baixa de insumos da ficha técnica do produto ou material avulso
+  if (productComps.length > 0) {
+    for (const comp of productComps) {
+      const deductionQty = (parseFloat(comp.quantityPerUnit) || 1) * productQuantity;
+      const [mat] = await db.select().from(materials).where(eq(materials.id, comp.materialId)).limit(1);
+      if (mat) {
+        await db.insert(stockMovements).values({
+          materialId: mat.id,
+          orderId: newOrder.id,
+          type: "saida",
+          quantity: String(deductionQty),
+          unitCostCents: mat.costPriceCents,
+          reason: `Baixa de estoque (Ficha Técnica Produto) - Pedido ${newOrder.code} (${title})`,
+        });
+
+        const newStock = Math.max(0, Number(mat.currentStock) - deductionQty);
+        await db
+          .update(materials)
+          .set({ currentStock: String(newStock), updatedAt: new Date() })
+          .where(eq(materials.id, mat.id));
+      }
+    }
+  } else if (materialId && materialQuantity > 0) {
     const [mat] = await db.select().from(materials).where(eq(materials.id, materialId)).limit(1);
     if (mat) {
       await db.insert(stockMovements).values({

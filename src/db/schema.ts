@@ -268,3 +268,31 @@ export const companySettings = pgTable("company_settings", {
   defaultPaymentTerms: text("default_payment_terms").default("50% de entrada e o restante na entrega."),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
+
+// PRODUTOS & SERVIÇOS
+export const productsServices = pgTable("products_services", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  code: varchar("code", { length: 50 }).notNull().unique(), // ex: PRD-001, SRV-001
+  name: varchar("name", { length: 255 }).notNull(),
+  type: varchar("type", { length: 20 }).default("produto").notNull(), // 'produto' ou 'servico'
+  category: varchar("category", { length: 100 }).notNull(), // Fachadas, Letras Caixa, Banners, Totens, Instalação, etc.
+  unit: varchar("unit", { length: 30 }).default("un").notNull(), // m2, ml, un, hora, diaria
+  salePriceCents: integer("sale_price_cents").default(0).notNull(), // Preço base de venda em centavos
+  costPriceCents: integer("cost_price_cents").default(0).notNull(), // Custo estimado ou soma dos insumos
+  markupPercent: numeric("markup_percent", { precision: 5, scale: 2 }).default("50.00").notNull(),
+  description: text("description"),
+  active: boolean("active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// COMPONENTES / FICHA TÉCNICA DO PRODUTO (Materiais do Estoque)
+export const productComponents = pgTable("product_components", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  productId: uuid("product_id").references(() => productsServices.id, { onDelete: "cascade" }).notNull(),
+  materialId: uuid("material_id").references(() => materials.id, { onDelete: "cascade" }).notNull(),
+  quantityPerUnit: numeric("quantity_per_unit", { precision: 12, scale: 3 }).notNull(), // Ex: 1.15 m2 por 1 m2 de fachada
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+

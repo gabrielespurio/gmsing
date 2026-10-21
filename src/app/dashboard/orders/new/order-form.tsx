@@ -10,6 +10,8 @@ import {
   Save,
   DollarSign,
   Info,
+  Boxes,
+  Layers,
 } from "lucide-react";
 import { createDirectOrderAction } from "@/domains/quotes/actions";
 
@@ -32,13 +34,28 @@ interface MaterialOption {
   currentStock: string;
 }
 
+export interface ProductOption {
+  id: string;
+  code: string;
+  name: string;
+  type: string;
+  category: string;
+  unit: string;
+  salePriceCents: number;
+  costPriceCents: number;
+  description: string | null;
+}
+
 interface DirectOrderFormProps {
   clients: ClientOption[];
   materials: MaterialOption[];
+  products?: ProductOption[];
 }
 
-export function DirectOrderForm({ clients, materials }: DirectOrderFormProps) {
+export function DirectOrderForm({ clients, materials, products = [] }: DirectOrderFormProps) {
   const [selectedClientId, setSelectedClientId] = useState(clients[0]?.id || "");
+  const [selectedProductId, setSelectedProductId] = useState("");
+  const [productQuantity, setProductQuantity] = useState("1");
   const [title, setTitle] = useState("");
   const [totalAmount, setTotalAmount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("pix");
@@ -52,6 +69,17 @@ export function DirectOrderForm({ clients, materials }: DirectOrderFormProps) {
   const [materialQuantity, setMaterialQuantity] = useState("");
   const [productionNotes, setProductionNotes] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleProductSelect = (prodId: string) => {
+    setSelectedProductId(prodId);
+    if (!prodId) return;
+    const prod = products.find((p) => p.id === prodId);
+    if (prod) {
+      setTitle(`${prod.name}`);
+      const val = (prod.salePriceCents / 100).toFixed(2).replace(".", ",");
+      setTotalAmount(val);
+    }
+  };
 
   // Quando seleciona cliente, preenche endereço sugerido se disponível
   const handleClientChange = (clientId: string) => {
@@ -78,12 +106,73 @@ export function DirectOrderForm({ clients, materials }: DirectOrderFormProps) {
       }}
       className="space-y-6"
     >
+      {/* Hidden inputs para Produto do Catálogo */}
+      <input type="hidden" name="productId" value={selectedProductId} />
+      <input type="hidden" name="productQuantity" value={productQuantity} />
+
       {/* Dados Principais do Pedido */}
       <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-2xs space-y-4">
-        <h2 className="text-base font-semibold text-slate-800 border-b border-slate-100 pb-3 flex items-center gap-2">
-          <ShoppingBag className="w-4 h-4 text-[#B87A52]" />
-          <span>1. Identificação do Pedido & Cliente</span>
+        <h2 className="text-base font-semibold text-slate-800 border-b border-slate-100 pb-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <ShoppingBag className="w-4 h-4 text-[#B87A52]" />
+            <span>1. Identificação do Pedido & Cliente</span>
+          </div>
+          <span className="text-xs text-slate-500 font-normal">
+            Venda direta ou produção sob encomenda
+          </span>
         </h2>
+
+        {/* Seletor de Produto do Catálogo */}
+        {products.length > 0 && (
+          <div className="p-3.5 bg-slate-50 rounded-lg border border-slate-200 space-y-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <span className="text-xs font-bold text-[#0B1730] flex items-center gap-1.5 shrink-0">
+                <Boxes className="w-4 h-4 text-[#B87A52]" />
+                <span>Carregar Produto / Serviço do Catálogo:</span>
+              </span>
+              <span className="text-[11px] text-slate-400">
+                Preenche título, valor e aciona ficha técnica de estoque
+              </span>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-center gap-2">
+              <select
+                value={selectedProductId}
+                onChange={(e) => handleProductSelect(e.target.value)}
+                className="flex-1 w-full h-9 px-3 bg-white border border-slate-300 rounded-lg text-xs text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-[#B87A52]/40"
+              >
+                <option value="">-- Nenhum (Preenchimento Manual) --</option>
+                {products.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    [{p.code}] {p.name} ({p.category}) - R$ {(p.salePriceCents / 100).toFixed(2).replace(".", ",")} / {p.unit}
+                  </option>
+                ))}
+              </select>
+
+              {selectedProductId && (
+                <div className="flex items-center gap-1.5 shrink-0 w-full sm:w-auto">
+                  <label className="text-xs font-semibold text-slate-600">Qtde:</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={productQuantity}
+                    onChange={(e) => {
+                      const qty = e.target.value;
+                      setProductQuantity(qty);
+                      const prod = products.find((p) => p.id === selectedProductId);
+                      if (prod) {
+                        const parsedQ = parseFloat(qty) || 1;
+                        const total = (prod.salePriceCents * parsedQ) / 100;
+                        setTotalAmount(total.toFixed(2).replace(".", ","));
+                      }
+                    }}
+                    className="w-20 h-9 px-2 bg-white border border-slate-300 rounded-lg text-xs font-mono font-bold text-center"
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
@@ -258,6 +347,15 @@ export function DirectOrderForm({ clients, materials }: DirectOrderFormProps) {
             Dedução automática do saldo disponível
           </span>
         </h2>
+
+        {selectedProductId && (
+          <div className="p-3 bg-purple-50 rounded-lg border border-purple-200 text-xs text-purple-900 flex items-center gap-2">
+            <Layers className="w-4 h-4 text-purple-700 shrink-0" />
+            <span>
+              <strong>Ficha Técnica Ativa:</strong> Como você selecionou um produto do catálogo ({title}), os insumos vinculados serão baixados automaticamente do estoque. Não é necessário selecionar material avulso abaixo, a menos que queira dar baixa em um insumo extra.
+            </span>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="md:col-span-2">
