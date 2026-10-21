@@ -8,12 +8,9 @@ import {
   Edit2,
   Trash2,
   AlertTriangle,
-  ArrowDown,
-  ArrowUp,
   RefreshCw,
   X,
   Save,
-  Layers,
 } from "lucide-react";
 import {
   createMaterialAction,
@@ -33,19 +30,8 @@ export interface MaterialData {
   active: boolean;
 }
 
-export interface MovementData {
-  id: string;
-  type: string;
-  quantity: string;
-  reason: string;
-  createdAt: Date;
-  materialName: string;
-  materialUnit: string;
-}
-
 interface StockManagerProps {
   initialMaterials: MaterialData[];
-  movements: MovementData[];
 }
 
 function formatCurrency(cents: number) {
@@ -55,42 +41,14 @@ function formatCurrency(cents: number) {
   }).format(cents / 100);
 }
 
-function formatDate(date: Date) {
-  return new Intl.DateTimeFormat("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(date));
-}
-
-const CATEGORIES = [
-  "Todos",
-  "ACM",
-  "Lona",
-  "Vinil",
-  "Metalon",
-  "LED",
-  "Acrílico",
-  "Serralheria",
-  "Outros",
-];
-
-const UNITS = ["chapa", "m2", "ml", "barra", "un", "litro", "kg", "rolo", "pacote"];
-
-export function StockManager({ initialMaterials, movements }: StockManagerProps) {
+export function StockManager({ initialMaterials }: StockManagerProps) {
   const [search, setSearch] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("Todos");
   const [modalOpen, setModalOpen] = useState(false);
   const [editingMaterial, setEditingMaterial] = useState<MaterialData | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Filtros de busca e categoria
+  // Filtro de busca simples por texto
   const filteredMaterials = initialMaterials.filter((m) => {
-    if (selectedCategory !== "Todos" && m.category.toLowerCase() !== selectedCategory.toLowerCase()) {
-      return false;
-    }
     if (search.trim()) {
       const q = search.toLowerCase();
       const matchName = m.name?.toLowerCase().includes(q);
@@ -153,7 +111,7 @@ export function StockManager({ initialMaterials, movements }: StockManagerProps)
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-2xs">
           <div className="flex items-center justify-between text-slate-400">
             <span className="text-xs font-semibold uppercase tracking-wider">Itens Cadastrados</span>
@@ -175,195 +133,117 @@ export function StockManager({ initialMaterials, movements }: StockManagerProps)
             <span className="text-xs text-slate-500">precisam de compra</span>
           </div>
         </div>
+      </div>
 
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-2xs">
-          <div className="flex items-center justify-between text-slate-400">
-            <span className="text-xs font-semibold uppercase tracking-wider">Movimentações Recentes</span>
-            <RefreshCw className="w-4 h-4 text-[#B87A52]" />
-          </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-[#B87A52]">{movements.length}</span>
-            <span className="text-xs text-slate-500">registros</span>
-          </div>
+      {/* Barra de Busca Simples */}
+      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
+        <div className="relative w-full">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar material por nome, categoria ou código..."
+            className="w-full h-10 pl-9 pr-3 bg-slate-50 border border-slate-300 rounded-lg text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#B87A52]/40 focus:border-[#B87A52]"
+          />
         </div>
       </div>
 
-      {/* Barra de Busca & Categorias */}
-      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs space-y-3">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="relative flex-1 max-w-md">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar material por nome, categoria ou código..."
-              className="w-full h-9 pl-9 pr-3 bg-slate-50 border border-slate-300 rounded-lg text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#B87A52]/40 focus:border-[#B87A52]"
-            />
-          </div>
-
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0">
-            {CATEGORIES.map((cat) => (
-              <button
-                key={cat}
-                onClick={() => setSelectedCategory(cat)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors cursor-pointer ${
-                  selectedCategory === cat
-                    ? "bg-[#14274B] text-white shadow-2xs font-semibold"
-                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                }`}
-              >
-                {cat}
-              </button>
-            ))}
-          </div>
+      {/* Tabela de Materiais (Largura Completa) */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+          <h2 className="font-semibold text-slate-800 text-sm">Saldos Atuais em Estoque</h2>
+          <span className="text-xs text-slate-500">{filteredMaterials.length} materiais</span>
         </div>
-      </div>
 
-      {/* Grid: Tabela de Materiais & Histórico de Movimentações */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Materiais */}
-        <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
-            <h2 className="font-semibold text-slate-800 text-sm">Saldos Atuais em Estoque</h2>
-            <span className="text-xs text-slate-500">{filteredMaterials.length} materiais</span>
-          </div>
-
-          {filteredMaterials.length === 0 ? (
-            <div className="text-center py-16 px-4">
-              <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-3 text-slate-400">
-                <Package className="w-6 h-6" />
-              </div>
-              <h3 className="text-base font-semibold text-slate-800">Nenhum material encontrado</h3>
-              <p className="text-sm text-slate-500 max-w-md mx-auto mt-1 mb-5">
-                Não há materiais cadastrados com os filtros atuais.
-              </p>
-              <button
-                onClick={handleOpenCreate}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#0B1730] hover:bg-[#14274B] text-white text-sm font-medium transition-colors cursor-pointer"
-              >
-                <Plus className="w-4 h-4 text-[#E3B48A]" />
-                <span>Cadastrar Material</span>
-              </button>
+        {filteredMaterials.length === 0 ? (
+          <div className="text-center py-16 px-4">
+            <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-3 text-slate-400">
+              <Package className="w-6 h-6" />
             </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm text-slate-700">
-                <thead className="bg-slate-50 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200">
-                  <tr>
-                    <th className="px-5 py-3.5">Material</th>
-                    <th className="px-5 py-3.5">Categoria</th>
-                    <th className="px-5 py-3.5 text-right">Custo Unit.</th>
-                    <th className="px-5 py-3.5 text-center">Mínimo</th>
-                    <th className="px-5 py-3.5 text-center">Saldo Atual</th>
-                    <th className="px-5 py-3.5 text-right">Ações</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {filteredMaterials.map((m) => {
-                    const isLow = Number(m.currentStock) <= Number(m.minStock);
-                    return (
-                      <tr key={m.id} className="hover:bg-slate-50/60 transition-colors">
-                        <td className="px-5 py-4">
-                          <div className="font-semibold text-slate-900">{m.name}</div>
-                          {m.notes && <div className="text-xs text-slate-400 mt-0.5">{m.notes}</div>}
-                        </td>
-                        <td className="px-5 py-4">
-                          <span className="text-xs font-medium px-2 py-0.5 rounded bg-slate-100 text-slate-700">
-                            {m.category}
-                          </span>
-                        </td>
-                        <td className="px-5 py-4 text-right font-mono text-xs text-slate-700 font-semibold">
-                          {formatCurrency(m.costPriceCents)}/{m.unit}
-                        </td>
-                        <td className="px-5 py-4 text-center font-mono text-xs text-slate-500">
-                          {m.minStock} {m.unit}
-                        </td>
-                        <td className="px-5 py-4 text-center">
-                          <span
-                            className={`font-mono font-bold px-2.5 py-1 rounded-full text-xs ${
-                              isLow
-                                ? "bg-rose-100 text-rose-800 border border-rose-200"
-                                : "bg-emerald-100 text-emerald-800"
-                            }`}
+            <h3 className="text-base font-semibold text-slate-800">Nenhum material encontrado</h3>
+            <p className="text-sm text-slate-500 max-w-md mx-auto mt-1 mb-5">
+              Não há materiais correspondentes à busca.
+            </p>
+            <button
+              onClick={handleOpenCreate}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#0B1730] hover:bg-[#14274B] text-white text-sm font-medium transition-colors cursor-pointer"
+            >
+              <Plus className="w-4 h-4 text-[#E3B48A]" />
+              <span>Cadastrar Material</span>
+            </button>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm text-slate-700">
+              <thead className="bg-slate-50 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200">
+                <tr>
+                  <th className="px-6 py-3.5">Material</th>
+                  <th className="px-6 py-3.5">Categoria</th>
+                  <th className="px-6 py-3.5 text-right">Custo Unit.</th>
+                  <th className="px-6 py-3.5 text-center">Mínimo</th>
+                  <th className="px-6 py-3.5 text-center">Saldo Atual</th>
+                  <th className="px-6 py-3.5 text-right">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredMaterials.map((m) => {
+                  const isLow = Number(m.currentStock) <= Number(m.minStock);
+                  return (
+                    <tr key={m.id} className="hover:bg-slate-50/60 transition-colors">
+                      <td className="px-6 py-4">
+                        <div className="font-semibold text-slate-900">{m.name}</div>
+                        {m.notes && <div className="text-xs text-slate-400 mt-0.5">{m.notes}</div>}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="text-xs font-medium px-2.5 py-1 rounded bg-slate-100 text-slate-700">
+                          {m.category}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-right font-mono text-xs text-slate-700 font-semibold">
+                        {formatCurrency(m.costPriceCents)}/{m.unit}
+                      </td>
+                      <td className="px-6 py-4 text-center font-mono text-xs text-slate-500">
+                        {m.minStock} {m.unit}
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <span
+                          className={`font-mono font-bold px-2.5 py-1 rounded-full text-xs ${
+                            isLow
+                              ? "bg-rose-100 text-rose-800 border border-rose-200"
+                              : "bg-emerald-100 text-emerald-800"
+                          }`}
+                        >
+                          {m.currentStock} {m.unit}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEdit(m)}
+                            className="p-1.5 rounded-md text-slate-600 hover:text-[#B87A52] hover:bg-[#B87A52]/10 transition-colors cursor-pointer"
+                            title="Editar Material"
                           >
-                            {m.currentStock} {m.unit}
-                          </span>
-                        </td>
-                        <td className="px-5 py-4 text-right">
-                          <div className="flex items-center justify-end gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => handleOpenEdit(m)}
-                              className="p-1.5 rounded-md text-slate-600 hover:text-[#B87A52] hover:bg-[#B87A52]/10 transition-colors cursor-pointer"
-                              title="Editar Material"
-                            >
-                              <Edit2 className="w-4 h-4" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDelete(m)}
-                              className="p-1.5 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                              title="Excluir Material"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-
-        {/* Movimentações / Baixas por Pedido */}
-        <div className="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden flex flex-col">
-          <div className="px-6 py-4 border-b border-slate-200">
-            <h2 className="font-semibold text-slate-800 text-sm">Histórico de Baixas & Consumo</h2>
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(m)}
+                            className="p-1.5 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                            title="Excluir Material"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
-          <div className="p-4 space-y-3 overflow-y-auto max-h-[500px] flex-1">
-            {movements.length === 0 ? (
-              <p className="text-xs text-slate-400 text-center py-8">
-                Nenhuma movimentação de matéria-prima registrada ainda.
-              </p>
-            ) : (
-              movements.map((mov) => (
-                <div
-                  key={mov.id}
-                  className="p-3 rounded-lg border border-slate-100 bg-slate-50/70 text-xs space-y-1"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-slate-900">{mov.materialName}</span>
-                    <span
-                      className={`font-mono font-bold flex items-center gap-0.5 ${
-                        mov.type === "entrada" ? "text-emerald-600" : "text-rose-600"
-                      }`}
-                    >
-                      {mov.type === "entrada" ? (
-                        <>
-                          <ArrowUp className="w-3 h-3" />
-                          +{mov.quantity} {mov.materialUnit}
-                        </>
-                      ) : (
-                        <>
-                          <ArrowDown className="w-3 h-3" />
-                          -{mov.quantity} {mov.materialUnit}
-                        </>
-                      )}
-                    </span>
-                  </div>
-                  <p className="text-slate-600 text-[11px] leading-tight">{mov.reason}</p>
-                  <span className="text-[10px] text-slate-400 block pt-0.5">
-                    {formatDate(mov.createdAt)}
-                  </span>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
+        )}
       </div>
 
       {/* Modal de Cadastro / Edição de Material */}
