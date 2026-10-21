@@ -27,6 +27,7 @@ import {
   Settings as SettingsIcon,
   Check,
   ShieldCheck,
+  UserCheck,
 } from "lucide-react";
 import {
   createUserAction,
@@ -153,6 +154,13 @@ export const SYSTEM_MODULES: SystemModule[] = [
     description: "Contas a receber, fluxo e faturamento",
     icon: DollarSign,
     badgeColor: "bg-green-50 text-green-700 border-green-200",
+  },
+  {
+    key: "employees",
+    label: "Funcionários",
+    description: "Equipe interna, cargos, setores e controle de pessoal",
+    icon: UserCheck,
+    badgeColor: "bg-rose-50 text-rose-700 border-rose-200",
   },
   {
     key: "settings",
@@ -820,7 +828,7 @@ export function SettingsManager({
                     </button>
                     <button
                       type="button"
-                      onClick={() => setSelectedModules(["dashboard", "orders", "stock", "purchases", "products"])}
+                      onClick={() => setSelectedModules(["dashboard", "orders", "stock", "purchases", "products", "employees"])}
                       className="text-[11px] font-semibold px-2 py-1 rounded bg-amber-50 hover:bg-amber-100 text-amber-700 transition-colors cursor-pointer"
                     >
                       Produção
@@ -831,6 +839,13 @@ export function SettingsManager({
                       className="text-[11px] font-semibold px-2 py-1 rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-700 transition-colors cursor-pointer"
                     >
                       Financeiro
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedModules(["dashboard", "employees", "settings", "clients"])}
+                      className="text-[11px] font-semibold px-2 py-1 rounded bg-purple-50 hover:bg-purple-100 text-purple-700 transition-colors cursor-pointer"
+                    >
+                      Gestão
                     </button>
                   </div>
                 </div>

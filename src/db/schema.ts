@@ -330,4 +330,23 @@ export const purchaseItems = pgTable("purchase_items", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// FUNCIONÁRIOS / EQUIPE
+export const employees = pgTable("employees", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  document: varchar("document", { length: 30 }), // CPF
+  role: varchar("role", { length: 100 }).notNull(), // Cargo: Impressor, Instalador, etc.
+  department: varchar("department", { length: 100 }).notNull(), // Setor: Produção, Instalação, etc.
+  phone: varchar("phone", { length: 50 }),
+  email: varchar("email", { length: 255 }),
+  admissionDate: timestamp("admission_date"),
+  salary: numeric("salary", { precision: 12, scale: 2 }),
+  hourlyRate: numeric("hourly_rate", { precision: 10, scale: 2 }),
+  notes: text("notes"),
+  active: boolean("active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+
 
