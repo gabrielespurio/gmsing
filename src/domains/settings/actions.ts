@@ -56,6 +56,12 @@ export async function updateUserAction(formData: FormData) {
     throw new Error("Identificador, nome e e-mail são obrigatórios.");
   }
 
+  // Proteção: o usuário admin não pode ser alterado
+  const [targetUser] = await db.select().from(users).where(eq(users.id, id)).limit(1);
+  if (targetUser && (targetUser.email === "admin@gmsign.com.br" || targetUser.role === "admin")) {
+    throw new Error("O usuário administrador principal é protegido e não pode ser alterado.");
+  }
+
   const updateData: Record<string, any> = {
     name,
     email,
@@ -75,6 +81,13 @@ export async function updateUserAction(formData: FormData) {
 
 export async function deleteUserAction(id: string) {
   if (!id) return;
+
+  // Proteção: o usuário admin não pode ser excluído nem inativado
+  const [targetUser] = await db.select().from(users).where(eq(users.id, id)).limit(1);
+  if (targetUser && (targetUser.email === "admin@gmsign.com.br" || targetUser.role === "admin")) {
+    throw new Error("O usuário administrador principal é protegido e não pode ser excluído.");
+  }
+
   // Inativa o usuário com segurança
   await db.update(users).set({ active: false, updatedAt: new Date() }).where(eq(users.id, id));
   revalidatePath("/dashboard/settings");

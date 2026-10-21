@@ -15,6 +15,7 @@ import {
   Save,
   Shield,
   Key,
+  Lock,
 } from "lucide-react";
 import {
   createUserAction,
@@ -242,9 +243,20 @@ export function SettingsManager({
                     bg: "bg-slate-100",
                     text: "text-slate-700",
                   };
+                  const isAdminUser = u.email === "admin@gmsign.com.br" || u.role === "admin";
                   return (
                     <tr key={u.id} className="hover:bg-slate-50/60 transition-colors">
-                      <td className="px-6 py-4 font-semibold text-slate-900">{u.name}</td>
+                      <td className="px-6 py-4 font-semibold text-slate-900">
+                        <div className="flex items-center gap-2">
+                          <span>{u.name}</span>
+                          {isAdminUser && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">
+                              <Lock className="w-2.5 h-2.5" />
+                              Fixo
+                            </span>
+                          )}
+                        </div>
+                      </td>
                       <td className="px-6 py-4 font-mono text-xs text-slate-600">{u.email}</td>
                       <td className="px-6 py-4">
                         <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${roleBadge.bg} ${roleBadge.text}`}>
@@ -266,29 +278,41 @@ export function SettingsManager({
                         )}
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => {
-                              setEditingUser(u);
-                              setUserModalOpen(true);
-                            }}
-                            className="p-1.5 rounded-md text-slate-600 hover:text-[#B87A52] hover:bg-[#B87A52]/10 transition-colors cursor-pointer"
-                            title="Editar Usuário"
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={async () => {
-                              if (window.confirm(`Deseja inativar o usuário "${u.name}"?`)) {
-                                await deleteUserAction(u.id);
-                              }
-                            }}
-                            className="p-1.5 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                            title="Inativar Usuário"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
+                        {isAdminUser ? (
+                          <div className="flex items-center justify-end">
+                            <span
+                              className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-100 text-slate-500 border border-slate-200 select-none"
+                              title="Usuário Administrador principal protegido contra alterações e exclusão."
+                            >
+                              <Lock className="w-3.5 h-3.5 text-amber-600" />
+                              <span>Protegido</span>
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => {
+                                setEditingUser(u);
+                                setUserModalOpen(true);
+                              }}
+                              className="p-1.5 rounded-md text-slate-600 hover:text-[#B87A52] hover:bg-[#B87A52]/10 transition-colors cursor-pointer"
+                              title="Editar Usuário"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={async () => {
+                                if (window.confirm(`Deseja inativar o usuário "${u.name}"?`)) {
+                                  await deleteUserAction(u.id);
+                                }
+                              }}
+                              className="p-1.5 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                              title="Inativar Usuário"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   );
@@ -534,15 +558,25 @@ export function SettingsManager({
 
             <form
               action={async (formData: FormData) => {
-                setIsSubmitting(true);
-                if (editingUser) {
-                  formData.append("id", editingUser.id);
-                  await updateUserAction(formData);
-                } else {
-                  await createUserAction(formData);
+                if (editingUser && (editingUser.email === "admin@gmsign.com.br" || editingUser.role === "admin")) {
+                  alert("O usuário administrador principal é protegido e não pode ser alterado.");
+                  return;
                 }
-                setIsSubmitting(false);
-                setUserModalOpen(false);
+                setIsSubmitting(true);
+                try {
+                  if (editingUser) {
+                    formData.append("id", editingUser.id);
+                    await updateUserAction(formData);
+                  } else {
+                    await createUserAction(formData);
+                  }
+                  setUserModalOpen(false);
+                } catch (err: unknown) {
+                  const msg = err instanceof Error ? err.message : "Erro ao processar usuário";
+                  alert(msg);
+                } finally {
+                  setIsSubmitting(false);
+                }
               }}
               className="p-6 space-y-4"
             >
