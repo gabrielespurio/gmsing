@@ -12,6 +12,7 @@ export default async function SettingsPage() {
       name: users.name,
       email: users.email,
       role: users.role,
+      allowedModules: users.allowedModules,
       active: users.active,
       createdAt: users.createdAt,
     })

@@ -1,4 +1,4 @@
-﻿import { createHmac, timingSafeEqual, scryptSync } from "node:crypto";
+import { createHmac, timingSafeEqual, scryptSync } from "node:crypto";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -48,21 +48,37 @@ export async function checkCredentials(email: string, password: string) {
     return null;
   }
 
+  let allowedModules: string[] = ["all"];
+  try {
+    allowedModules = JSON.parse(user.allowedModules || '["all"]');
+  } catch {
+    allowedModules = user.role === "admin" ? ["all"] : [];
+  }
+
   return {
     id: user.id,
     name: user.name,
     email: user.email,
     role: user.role,
+    allowedModules,
   };
 }
 
-export function createSessionToken(user: { id: string; email: string; name: string; role: string }) {
+export function createSessionToken(user: {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+  allowedModules?: string[];
+}) {
+  const allowed = user.allowedModules || (user.role === "admin" ? ["all"] : []);
   const payload = Buffer.from(
     JSON.stringify({
       id: user.id,
       email: user.email,
       name: user.name,
       role: user.role,
+      allowedModules: allowed,
       exp: Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS,
     })
   ).toString("base64url");
@@ -81,6 +97,11 @@ export function verifySessionToken(token: string | undefined) {
       email: data.email as string,
       name: data.name as string,
       role: data.role as string,
+      allowedModules: Array.isArray(data.allowedModules)
+        ? (data.allowedModules as string[])
+        : data.role === "admin"
+        ? ["all"]
+        : [],
     };
   } catch {
     return null;

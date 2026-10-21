@@ -17,6 +17,7 @@ export const users = pgTable("users", {
   email: varchar("email", { length: 255 }).notNull().unique(),
   passwordHash: text("password_hash").notNull(),
   role: varchar("role", { length: 50 }).default("admin").notNull(), // admin, comercial, producao, financeiro
+  allowedModules: text("allowed_modules").default('["all"]').notNull(), // JSON array de modulos ou ["all"]
   active: boolean("active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),

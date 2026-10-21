@@ -31,6 +31,15 @@ export async function createUserAction(formData: FormData) {
     throw new Error("Já existe um usuário cadastrado com este e-mail.");
   }
 
+  const allowedModulesJson = (formData.get("allowedModules") as string) || '["quotes","clients"]';
+  let allowedModules = '["quotes","clients"]';
+  try {
+    const parsed = JSON.parse(allowedModulesJson);
+    allowedModules = JSON.stringify(Array.isArray(parsed) && parsed.length > 0 ? parsed : ["quotes"]);
+  } catch {
+    allowedModules = '["quotes"]';
+  }
+
   const passwordHash = hashPassword(password);
 
   await db.insert(users).values({
@@ -38,6 +47,7 @@ export async function createUserAction(formData: FormData) {
     email,
     passwordHash,
     role,
+    allowedModules,
     active: true,
   });
 
@@ -51,6 +61,7 @@ export async function updateUserAction(formData: FormData) {
   const password = (formData.get("password") as string)?.trim();
   const role = (formData.get("role") as string) || "comercial";
   const active = formData.get("active") === "true";
+  const allowedModulesJson = formData.get("allowedModules") as string;
 
   if (!id || !name || !email) {
     throw new Error("Identificador, nome e e-mail são obrigatórios.");
@@ -69,6 +80,15 @@ export async function updateUserAction(formData: FormData) {
     active,
     updatedAt: new Date(),
   };
+
+  if (allowedModulesJson) {
+    try {
+      const parsed = JSON.parse(allowedModulesJson);
+      updateData.allowedModules = JSON.stringify(Array.isArray(parsed) ? parsed : ["quotes"]);
+    } catch {
+      // mantem o existente
+    }
+  }
 
   if (password) {
     updateData.passwordHash = hashPassword(password);

@@ -24,20 +24,26 @@ interface SidebarProps {
     email: string;
     name: string;
     role: string;
+    allowedModules?: string[];
   };
 }
 
 export function Sidebar({ user }: SidebarProps) {
   const pathname = usePathname();
 
+  const allowed = user.allowedModules || (user.role === "admin" ? ["all"] : []);
+  const isAdmin = user.role === "admin" || allowed.includes("all");
+
   const navItems = [
     {
+      key: "dashboard",
       label: "Visão Geral",
       href: "/dashboard",
       icon: LayoutDashboard,
       active: pathname === "/dashboard",
     },
     {
+      key: "quotes",
       label: "Orçamentos",
       href: "/dashboard/quotes",
       icon: FileText,
@@ -45,6 +51,7 @@ export function Sidebar({ user }: SidebarProps) {
       badge: "Vendas",
     },
     {
+      key: "orders",
       label: "Pedidos",
       href: "/dashboard/orders",
       icon: ShoppingBag,
@@ -52,6 +59,7 @@ export function Sidebar({ user }: SidebarProps) {
       badge: "Produção",
     },
     {
+      key: "products",
       label: "Produtos & Serviços",
       href: "/dashboard/products",
       icon: Boxes,
@@ -59,12 +67,14 @@ export function Sidebar({ user }: SidebarProps) {
       badge: "Catálogo",
     },
     {
+      key: "stock",
       label: "Estoque & Materiais",
       href: "/dashboard/stock",
       icon: PackageCheck,
       active: pathname.startsWith("/dashboard/stock"),
     },
     {
+      key: "purchases",
       label: "Compras",
       href: "/dashboard/purchases",
       icon: Truck,
@@ -72,12 +82,14 @@ export function Sidebar({ user }: SidebarProps) {
       badge: "Suprimentos",
     },
     {
+      key: "clients",
       label: "Clientes",
       href: "/dashboard/clients",
       icon: Users,
       active: pathname.startsWith("/dashboard/clients"),
     },
     {
+      key: "financial",
       label: "Financeiro",
       href: "/dashboard/financial",
       icon: DollarSign,
@@ -85,12 +97,18 @@ export function Sidebar({ user }: SidebarProps) {
       badge: "Receber",
     },
     {
+      key: "settings",
       label: "Configurações",
       href: "/dashboard/settings",
       icon: Settings,
       active: pathname.startsWith("/dashboard/settings"),
     },
   ];
+
+  const visibleNavItems = navItems.filter((item) => {
+    if (isAdmin) return true;
+    return allowed.includes(item.key);
+  });
 
   return (
     <aside className="w-64 h-screen bg-[#0B1730] border-r border-[#1e345e] flex flex-col shrink-0 select-none text-slate-300 sticky top-0 overflow-hidden">
@@ -120,7 +138,7 @@ export function Sidebar({ user }: SidebarProps) {
         <div className="px-3 pb-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
           Módulos Principais
         </div>
-        {navItems.map((item) => {
+        {visibleNavItems.map((item) => {
           const Icon = item.icon;
           return (
             <Link

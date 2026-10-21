@@ -16,6 +16,17 @@ import {
   Shield,
   Key,
   Lock,
+  LayoutDashboard,
+  FileText,
+  ShoppingBag,
+  Package,
+  Boxes,
+  ShoppingCart,
+  Users2,
+  DollarSign,
+  Settings as SettingsIcon,
+  Check,
+  ShieldCheck,
 } from "lucide-react";
 import {
   createUserAction,
@@ -35,6 +46,7 @@ export interface UserItem {
   name: string;
   email: string;
   role: string;
+  allowedModules?: string;
   active: boolean;
   createdAt: Date;
 }
@@ -77,6 +89,90 @@ const ROLE_LABELS: Record<string, { label: string; bg: string; text: string }> =
   financeiro: { label: "Financeiro", bg: "bg-emerald-100", text: "text-emerald-800" },
 };
 
+export interface SystemModule {
+  key: string;
+  label: string;
+  description: string;
+  icon: React.ComponentType<{ className?: string }>;
+  badgeColor: string;
+}
+
+export const SYSTEM_MODULES: SystemModule[] = [
+  {
+    key: "dashboard",
+    label: "Visão Geral",
+    description: "Métricas, indicadores e resumos do sistema",
+    icon: LayoutDashboard,
+    badgeColor: "bg-slate-100 text-slate-800 border-slate-200",
+  },
+  {
+    key: "quotes",
+    label: "Orçamentos",
+    description: "Criação, envio e conversão de propostas comerciais",
+    icon: FileText,
+    badgeColor: "bg-blue-50 text-blue-700 border-blue-200",
+  },
+  {
+    key: "orders",
+    label: "Pedidos",
+    description: "Acompanhamento da produção e ordens de serviço",
+    icon: ShoppingBag,
+    badgeColor: "bg-amber-50 text-amber-700 border-amber-200",
+  },
+  {
+    key: "products",
+    label: "Produtos & Serviços",
+    description: "Catálogo de produtos, serviços e precificação",
+    icon: Package,
+    badgeColor: "bg-indigo-50 text-indigo-700 border-indigo-200",
+  },
+  {
+    key: "stock",
+    label: "Estoque",
+    description: "Chapas, vinis, tintas, bobinas e saldo",
+    icon: Boxes,
+    badgeColor: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  },
+  {
+    key: "purchases",
+    label: "Compras",
+    description: "Entrada de suprimentos e importação XML NFe",
+    icon: ShoppingCart,
+    badgeColor: "bg-teal-50 text-teal-700 border-teal-200",
+  },
+  {
+    key: "clients",
+    label: "Clientes",
+    description: "Base cadastral de clientes PJ e PF",
+    icon: Users2,
+    badgeColor: "bg-sky-50 text-sky-700 border-sky-200",
+  },
+  {
+    key: "financial",
+    label: "Financeiro",
+    description: "Contas a receber, fluxo e faturamento",
+    icon: DollarSign,
+    badgeColor: "bg-green-50 text-green-700 border-green-200",
+  },
+  {
+    key: "settings",
+    label: "Configurações",
+    description: "Usuários, categorias e unidades",
+    icon: SettingsIcon,
+    badgeColor: "bg-purple-50 text-purple-700 border-purple-200",
+  },
+];
+
+export function parseUserModules(raw?: string | null): string[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
 export function SettingsManager({
   initialUsers,
   initialCategories,
@@ -98,6 +194,7 @@ export function SettingsManager({
   // Modais
   const [userModalOpen, setUserModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<UserItem | null>(null);
+  const [selectedModules, setSelectedModules] = useState<string[]>([]);
 
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<CategoryItem | null>(null);
@@ -215,6 +312,7 @@ export function SettingsManager({
             <button
               onClick={() => {
                 setEditingUser(null);
+                setSelectedModules(["dashboard", "quotes", "orders", "clients"]);
                 setUserModalOpen(true);
               }}
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[#B87A52] hover:bg-[#a66a43] text-white text-sm font-semibold transition-colors shadow-sm cursor-pointer"
@@ -230,7 +328,7 @@ export function SettingsManager({
                 <tr>
                   <th className="px-6 py-3.5">Nome / Usuário</th>
                   <th className="px-6 py-3.5">E-mail</th>
-                  <th className="px-6 py-3.5">Perfil de Acesso</th>
+                  <th className="px-6 py-3.5">Módulos de Acesso</th>
                   <th className="px-6 py-3.5">Data Cadastro</th>
                   <th className="px-6 py-3.5">Status</th>
                   <th className="px-6 py-3.5 text-right">Ações</th>
@@ -238,12 +336,10 @@ export function SettingsManager({
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {paginatedUsers.map((u) => {
-                  const roleBadge = ROLE_LABELS[u.role] || {
-                    label: u.role,
-                    bg: "bg-slate-100",
-                    text: "text-slate-700",
-                  };
                   const isAdminUser = u.email === "admin@gmsign.com.br" || u.role === "admin";
+                  const parsedMods = parseUserModules(u.allowedModules);
+                  const isAllAccess = isAdminUser || parsedMods.includes("all");
+
                   return (
                     <tr key={u.id} className="hover:bg-slate-50/60 transition-colors">
                       <td className="px-6 py-4 font-semibold text-slate-900">
@@ -259,9 +355,31 @@ export function SettingsManager({
                       </td>
                       <td className="px-6 py-4 font-mono text-xs text-slate-600">{u.email}</td>
                       <td className="px-6 py-4">
-                        <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${roleBadge.bg} ${roleBadge.text}`}>
-                          {roleBadge.label}
-                        </span>
+                        {isAllAccess ? (
+                          <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-purple-100 text-purple-800 border border-purple-200">
+                            <ShieldCheck className="w-3.5 h-3.5 text-purple-700" />
+                            Acesso Total ({SYSTEM_MODULES.length} módulos)
+                          </span>
+                        ) : (
+                          <div className="flex flex-wrap gap-1 max-w-xs">
+                            {parsedMods.length === 0 ? (
+                              <span className="text-xs text-slate-400 italic">Nenhum módulo liberado</span>
+                            ) : (
+                              parsedMods.map((modKey) => {
+                                const modDef = SYSTEM_MODULES.find((m) => m.key === modKey);
+                                if (!modDef) return null;
+                                return (
+                                  <span
+                                    key={modKey}
+                                    className={`text-[11px] font-medium px-2 py-0.5 rounded border ${modDef.badgeColor}`}
+                                  >
+                                    {modDef.label}
+                                  </span>
+                                );
+                              })
+                            )}
+                          </div>
+                        )}
                       </td>
                       <td className="px-6 py-4 text-xs text-slate-500">{formatDate(u.createdAt)}</td>
                       <td className="px-6 py-4">
@@ -293,6 +411,12 @@ export function SettingsManager({
                             <button
                               onClick={() => {
                                 setEditingUser(u);
+                                const userMods = parseUserModules(u.allowedModules);
+                                if (userMods.includes("all") || u.role === "admin") {
+                                  setSelectedModules(SYSTEM_MODULES.map((m) => m.key));
+                                } else {
+                                  setSelectedModules(userMods.length > 0 ? userMods : ["quotes", "clients"]);
+                                }
                                 setUserModalOpen(true);
                               }}
                               className="p-1.5 rounded-md text-slate-600 hover:text-[#B87A52] hover:bg-[#B87A52]/10 transition-colors cursor-pointer"
@@ -542,15 +666,20 @@ export function SettingsManager({
       ========================================================= */}
       {userModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
-              <h3 className="font-bold text-slate-900 text-base">
-                {editingUser ? "Editar Usuário" : "Novo Usuário"}
-              </h3>
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-2xl w-full max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50 shrink-0">
+              <div>
+                <h3 className="font-bold text-slate-900 text-base">
+                  {editingUser ? "Editar Usuário" : "Novo Usuário"}
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Defina os dados de autenticação e os módulos autorizados.
+                </p>
+              </div>
               <button
                 type="button"
                 onClick={() => setUserModalOpen(false)}
-                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-200/50"
+                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-200/50 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -562,8 +691,14 @@ export function SettingsManager({
                   alert("O usuário administrador principal é protegido e não pode ser alterado.");
                   return;
                 }
+                if (selectedModules.length === 0) {
+                  alert("Selecione pelo menos um módulo de acesso para este usuário.");
+                  return;
+                }
+
                 setIsSubmitting(true);
                 try {
+                  formData.set("allowedModules", JSON.stringify(selectedModules));
                   if (editingUser) {
                     formData.append("id", editingUser.id);
                     await updateUserAction(formData);
@@ -578,97 +713,197 @@ export function SettingsManager({
                   setIsSubmitting(false);
                 }
               }}
-              className="p-6 space-y-4"
+              className="p-6 space-y-5 overflow-y-auto flex-1"
             >
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                  Nome Completo *
-                </label>
-                <input
-                  type="text"
-                  name="name"
-                  required
-                  defaultValue={editingUser?.name || ""}
-                  placeholder="Ex: João da Silva"
-                  className="w-full h-9 px-3 bg-white border border-slate-300 rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#B87A52]/40 focus:border-[#B87A52]"
-                />
-              </div>
+              <input
+                type="hidden"
+                name="role"
+                value={selectedModules.length === SYSTEM_MODULES.length ? "admin" : (editingUser?.role || "operador")}
+              />
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                  E-mail de Acesso *
-                </label>
-                <input
-                  type="email"
-                  name="email"
-                  required
-                  defaultValue={editingUser?.email || ""}
-                  placeholder="usuario@gmsign.com.br"
-                  className="w-full h-9 px-3 bg-white border border-slate-300 rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#B87A52]/40 focus:border-[#B87A52]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                  Senha {editingUser ? "(Deixe em branco para não alterar)" : "*"}
-                </label>
-                <input
-                  type="password"
-                  name="password"
-                  required={!editingUser}
-                  placeholder="••••••••"
-                  className="w-full h-9 px-3 bg-white border border-slate-300 rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#B87A52]/40 focus:border-[#B87A52]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                  Perfil de Acesso / Função *
-                </label>
-                <select
-                  name="role"
-                  defaultValue={editingUser?.role || "comercial"}
-                  className="w-full h-9 px-3 bg-white border border-slate-300 rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#B87A52]/40 focus:border-[#B87A52]"
-                >
-                  <option value="admin">Administrador (Acesso total)</option>
-                  <option value="comercial">Comercial / Vendas (Orçamentos)</option>
-                  <option value="producao">Produção / Oficina (Pedidos e Estoque)</option>
-                  <option value="financeiro">Financeiro (Contas a Receber)</option>
-                </select>
-              </div>
-
-              {editingUser && (
+              {/* Dados Básicos */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                    Status da Conta
+                    Nome Completo *
                   </label>
-                  <select
-                    name="active"
-                    defaultValue={editingUser.active ? "true" : "false"}
+                  <input
+                    type="text"
+                    name="name"
+                    required
+                    defaultValue={editingUser?.name || ""}
+                    placeholder="Ex: João da Silva"
                     className="w-full h-9 px-3 bg-white border border-slate-300 rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#B87A52]/40 focus:border-[#B87A52]"
-                  >
-                    <option value="true">Ativo</option>
-                    <option value="false">Inativo</option>
-                  </select>
+                  />
                 </div>
-              )}
 
-              <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setUserModalOpen(false)}
-                  className="px-4 py-2 rounded-lg text-sm text-slate-600 hover:bg-slate-100 cursor-pointer"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-[#B87A52] hover:bg-[#a66a43] disabled:opacity-50 text-white font-bold text-sm shadow-sm cursor-pointer"
-                >
-                  <Save className="w-4 h-4" />
-                  <span>{isSubmitting ? "Salvando..." : "Salvar Usuário"}</span>
-                </button>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                    E-mail de Acesso *
+                  </label>
+                  <input
+                    type="email"
+                    name="email"
+                    required
+                    defaultValue={editingUser?.email || ""}
+                    placeholder="usuario@gmsign.com.br"
+                    className="w-full h-9 px-3 bg-white border border-slate-300 rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#B87A52]/40 focus:border-[#B87A52]"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                    Senha {editingUser ? "(Deixe em branco para não alterar)" : "*"}
+                  </label>
+                  <input
+                    type="password"
+                    name="password"
+                    required={!editingUser}
+                    placeholder="••••••••"
+                    className="w-full h-9 px-3 bg-white border border-slate-300 rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#B87A52]/40 focus:border-[#B87A52]"
+                  />
+                </div>
+
+                {editingUser && (
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                      Status da Conta
+                    </label>
+                    <select
+                      name="active"
+                      defaultValue={editingUser.active ? "true" : "false"}
+                      className="w-full h-9 px-3 bg-white border border-slate-300 rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#B87A52]/40 focus:border-[#B87A52]"
+                    >
+                      <option value="true">Ativo</option>
+                      <option value="false">Inativo</option>
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              {/* Seletor de Módulos */}
+              <div className="pt-2 border-t border-slate-200">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider">
+                      Módulos Permitidos para Acesso *
+                    </label>
+                    <p className="text-xs text-slate-500">
+                      Marque as áreas às quais este usuário terá permissão para visualizar e gerenciar.
+                    </p>
+                  </div>
+
+                  {/* Atalhos Rápidos */}
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedModules(SYSTEM_MODULES.map((m) => m.key))}
+                      className="text-[11px] font-semibold px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer"
+                    >
+                      Marcar Todos
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedModules([])}
+                      className="text-[11px] font-semibold px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer"
+                    >
+                      Limpar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedModules(["dashboard", "quotes", "clients", "products"])}
+                      className="text-[11px] font-semibold px-2 py-1 rounded bg-blue-50 hover:bg-blue-100 text-blue-700 transition-colors cursor-pointer"
+                    >
+                      Vendas
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedModules(["dashboard", "orders", "stock", "purchases", "products"])}
+                      className="text-[11px] font-semibold px-2 py-1 rounded bg-amber-50 hover:bg-amber-100 text-amber-700 transition-colors cursor-pointer"
+                    >
+                      Produção
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedModules(["dashboard", "quotes", "orders", "financial", "clients"])}
+                      className="text-[11px] font-semibold px-2 py-1 rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-700 transition-colors cursor-pointer"
+                    >
+                      Financeiro
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                  {SYSTEM_MODULES.map((mod) => {
+                    const isChecked = selectedModules.includes(mod.key);
+                    const ModIcon = mod.icon;
+                    return (
+                      <div
+                        key={mod.key}
+                        onClick={() => {
+                          setSelectedModules((prev) =>
+                            prev.includes(mod.key)
+                              ? prev.filter((k) => k !== mod.key)
+                              : [...prev, mod.key]
+                          );
+                        }}
+                        className={`relative flex items-start gap-3 p-3 rounded-xl border transition-all cursor-pointer select-none ${
+                          isChecked
+                            ? "bg-[#B87A52]/8 border-[#B87A52] shadow-2xs"
+                            : "bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/70"
+                        }`}
+                      >
+                        <div
+                          className={`w-4 h-4 mt-0.5 rounded flex items-center justify-center shrink-0 border transition-colors ${
+                            isChecked
+                              ? "bg-[#B87A52] border-[#B87A52] text-white"
+                              : "bg-white border-slate-300"
+                          }`}
+                        >
+                          {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
+                        </div>
+
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 mb-0.5">
+                            <ModIcon className={`w-3.5 h-3.5 shrink-0 ${isChecked ? "text-[#B87A52]" : "text-slate-400"}`} />
+                            <span className="text-xs font-bold text-slate-800 truncate">
+                              {mod.label}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-500 leading-snug line-clamp-2">
+                            {mod.description}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Rodapé com Ações */}
+              <div className="pt-4 border-t border-slate-100 flex items-center justify-between gap-3">
+                <div className="text-xs text-slate-500">
+                  <span className="font-bold text-slate-800">{selectedModules.length}</span> de {SYSTEM_MODULES.length} módulos selecionados
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setUserModalOpen(false)}
+                    className="px-4 py-2 rounded-lg text-sm text-slate-600 hover:bg-slate-100 cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-[#B87A52] hover:bg-[#a66a43] disabled:opacity-50 text-white font-bold text-sm shadow-sm cursor-pointer"
+                  >
+                    <Save className="w-4 h-4" />
+                    <span>{isSubmitting ? "Salvando..." : "Salvar Usuário"}</span>
+                  </button>
+                </div>
               </div>
             </form>
           </div>
