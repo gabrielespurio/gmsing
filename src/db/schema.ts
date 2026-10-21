@@ -243,6 +243,7 @@ export const paymentsReceived = pgTable("payments_received", {
 export const accountsPayable = pgTable("accounts_payable", {
   id: uuid("id").defaultRandom().primaryKey(),
   supplierId: uuid("supplier_id").references(() => suppliers.id),
+  purchaseId: uuid("purchase_id"),
   beneficiaryName: varchar("beneficiary_name", { length: 255 }).notNull(),
   orderId: uuid("order_id").references(() => orders.id),
   category: varchar("category", { length: 100 }).notNull(), // material, mao_de_obra, frete, equipamento, fixo
@@ -295,4 +296,37 @@ export const productComponents = pgTable("product_components", {
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+// COMPRAS & ENTRADAS DE NOTAS FISCAIS (XML)
+export const purchases = pgTable("purchases", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  code: varchar("code", { length: 50 }).notNull().unique(), // Ex: COM-2026-001
+  supplierId: uuid("supplier_id").references(() => suppliers.id),
+  nfeKey: varchar("nfe_key", { length: 50 }), // Chave de acesso de 44 dígitos da NF-e
+  nfeNumber: varchar("nfe_number", { length: 30 }),
+  nfeSeries: varchar("nfe_series", { length: 10 }),
+  issueDate: timestamp("issue_date"),
+  entryDate: timestamp("entry_date").defaultNow().notNull(),
+  totalAmountCents: integer("total_amount_cents").default(0).notNull(),
+  status: varchar("status", { length: 30 }).default("concluido").notNull(), // concluido, cancelado
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// ITENS DA COMPRA / NOTA FISCAL
+export const purchaseItems = pgTable("purchase_items", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  purchaseId: uuid("purchase_id").references(() => purchases.id, { onDelete: "cascade" }).notNull(),
+  materialId: uuid("material_id").references(() => materials.id), // Material do estoque associado
+  rawProductName: varchar("raw_product_name", { length: 255 }).notNull(),
+  rawProductCode: varchar("raw_product_code", { length: 50 }),
+  ncm: varchar("ncm", { length: 20 }),
+  cfop: varchar("cfop", { length: 10 }),
+  quantity: numeric("quantity", { precision: 12, scale: 3 }).notNull(),
+  unit: varchar("unit", { length: 30 }).notNull(), // UN, M2, ML, KG, CHAPA
+  unitCostCents: integer("unit_cost_cents").default(0).notNull(),
+  totalCostCents: integer("total_cost_cents").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 

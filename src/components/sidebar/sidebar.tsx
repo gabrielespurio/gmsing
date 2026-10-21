@@ -14,6 +14,7 @@ import {
   Settings,
   LogOut,
   ShieldAlert,
+  Truck,
 } from "lucide-react";
 import { logout } from "@/app/actions";
 
@@ -62,6 +63,13 @@ export function Sidebar({ user }: SidebarProps) {
       href: "/dashboard/stock",
       icon: PackageCheck,
       active: pathname.startsWith("/dashboard/stock"),
+    },
+    {
+      label: "Compras",
+      href: "/dashboard/purchases",
+      icon: Truck,
+      active: pathname.startsWith("/dashboard/purchases"),
+      badge: "Suprimentos",
     },
     {
       label: "Clientes",
