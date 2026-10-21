@@ -121,7 +121,7 @@ export async function createQuoteAction(formData: FormData) {
 
   revalidatePath("/dashboard/quotes");
   revalidatePath("/dashboard");
-  redirect(`/dashboard/quotes/${insertedQuote.id}`);
+  return { success: true, quoteId: insertedQuote.id };
 }
 
 /**
@@ -505,5 +505,5 @@ export async function createDirectOrderAction(formData: FormData) {
   revalidatePath("/dashboard/stock");
   revalidatePath("/dashboard");
 
-  redirect("/dashboard/orders");
+  return { success: true, orderId: newOrder.id };
 }

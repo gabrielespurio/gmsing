@@ -71,7 +71,7 @@ export default async function DashboardPage() {
 
         <div className="flex flex-wrap items-center gap-3">
           <Link
-            href="/dashboard/quotes/new"
+            href="/dashboard/quotes?new=true"
             className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[#B87A52] hover:bg-[#a66a43] text-white font-semibold text-sm shadow-sm transition"
           >
             <PlusCircle size={16} />
