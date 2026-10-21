@@ -21,6 +21,7 @@ import {
   updateClientAction,
   toggleClientStatusAction,
 } from "@/domains/clients/actions";
+import { Pagination } from "@/components/ui/pagination";
 
 export interface ClientData {
   id: string;
@@ -48,9 +49,12 @@ export function ClientManager({ initialClients }: ClientManagerProps) {
   const [clients, setClients] = useState<ClientData[]>(initialClients);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"ativos" | "inativos" | "todos">("ativos");
+  const [currentPage, setCurrentPage] = useState(1);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<ClientData | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const ITEMS_PER_PAGE = 10;
 
   // Filtros
   const filteredClients = initialClients.filter((c) => {
@@ -68,6 +72,11 @@ export function ClientManager({ initialClients }: ClientManagerProps) {
     }
     return true;
   });
+
+  const paginatedClients = filteredClients.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
 
   const activeCount = initialClients.filter((c) => c.active).length;
   const inactiveCount = initialClients.filter((c) => !c.active).length;
@@ -127,7 +136,10 @@ export function ClientManager({ initialClients }: ClientManagerProps) {
           <input
             type="text"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setCurrentPage(1);
+            }}
             placeholder="Buscar por razão social, nome fantasia, documento..."
             className="w-full h-9 pl-9 pr-3 bg-slate-50 border border-slate-300 rounded-lg text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#B87A52]/40 focus:border-[#B87A52]"
           />
@@ -135,7 +147,10 @@ export function ClientManager({ initialClients }: ClientManagerProps) {
 
         <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-lg text-xs font-medium">
           <button
-            onClick={() => setStatusFilter("ativos")}
+            onClick={() => {
+              setStatusFilter("ativos");
+              setCurrentPage(1);
+            }}
             className={`px-3 py-1.5 rounded-md transition-colors ${
               statusFilter === "ativos"
                 ? "bg-white text-[#0B1730] shadow-2xs font-semibold"
@@ -145,7 +160,10 @@ export function ClientManager({ initialClients }: ClientManagerProps) {
             Ativos ({activeCount})
           </button>
           <button
-            onClick={() => setStatusFilter("inativos")}
+            onClick={() => {
+              setStatusFilter("inativos");
+              setCurrentPage(1);
+            }}
             className={`px-3 py-1.5 rounded-md transition-colors ${
               statusFilter === "inativos"
                 ? "bg-white text-[#0B1730] shadow-2xs font-semibold"
@@ -155,7 +173,10 @@ export function ClientManager({ initialClients }: ClientManagerProps) {
             Inativos ({inactiveCount})
           </button>
           <button
-            onClick={() => setStatusFilter("todos")}
+            onClick={() => {
+              setStatusFilter("todos");
+              setCurrentPage(1);
+            }}
             className={`px-3 py-1.5 rounded-md transition-colors ${
               statusFilter === "todos"
                 ? "bg-white text-[#0B1730] shadow-2xs font-semibold"
@@ -212,7 +233,7 @@ export function ClientManager({ initialClients }: ClientManagerProps) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredClients.map((c) => (
+                {paginatedClients.map((c) => (
                   <tr key={c.id} className="hover:bg-slate-50/60 transition-colors">
                     <td className="px-6 py-4">
                       <div className="font-semibold text-slate-900">{c.name}</div>
@@ -299,6 +320,12 @@ export function ClientManager({ initialClients }: ClientManagerProps) {
                 ))}
               </tbody>
             </table>
+            <Pagination
+              currentPage={currentPage}
+              totalItems={filteredClients.length}
+              itemsPerPage={ITEMS_PER_PAGE}
+              onPageChange={setCurrentPage}
+            />
           </div>
         )}
       </div>

@@ -17,6 +17,7 @@ import {
   updateMaterialAction,
   deleteMaterialAction,
 } from "@/domains/stock/actions";
+import { Pagination } from "@/components/ui/pagination";
 
 export interface MaterialData {
   id: string;
@@ -61,6 +62,7 @@ export function StockManager({
   units,
 }: StockManagerProps) {
   const [search, setSearch] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingMaterial, setEditingMaterial] = useState<MaterialData | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -76,6 +78,8 @@ export function StockManager({
     }
     return true;
   });
+
+  const paginatedMaterials = filteredMaterials.slice((currentPage - 1) * 10, currentPage * 10);
 
   const lowStockCount = initialMaterials.filter(
     (m) => Number(m.currentStock) <= Number(m.minStock)
@@ -205,7 +209,7 @@ export function StockManager({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredMaterials.map((m) => {
+                {paginatedMaterials.map((m) => {
                   const isLow = Number(m.currentStock) <= Number(m.minStock);
                   return (
                     <tr key={m.id} className="hover:bg-slate-50/60 transition-colors">
@@ -260,6 +264,12 @@ export function StockManager({
                 })}
               </tbody>
             </table>
+            <Pagination
+              currentPage={currentPage}
+              totalItems={filteredMaterials.length}
+              itemsPerPage={10}
+              onPageChange={setCurrentPage}
+            />
           </div>
         )}
       </div>

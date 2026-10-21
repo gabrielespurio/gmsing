@@ -27,6 +27,7 @@ import {
   updateUnitAction,
   deleteUnitAction,
 } from "@/domains/settings/actions";
+import { Pagination } from "@/components/ui/pagination";
 
 export interface UserItem {
   id: string;
@@ -87,6 +88,12 @@ export function SettingsManager({
   const [searchCategory, setSearchCategory] = useState("");
   const [searchUnit, setSearchUnit] = useState("");
 
+  // Paginação
+  const ITEMS_PER_PAGE = 10;
+  const [userPage, setUserPage] = useState(1);
+  const [categoryPage, setCategoryPage] = useState(1);
+  const [unitPage, setUnitPage] = useState(1);
+
   // Modais
   const [userModalOpen, setUserModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<UserItem | null>(null);
@@ -106,17 +113,32 @@ export function SettingsManager({
     return u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q) || u.role.toLowerCase().includes(q);
   });
 
+  const paginatedUsers = filteredUsers.slice(
+    (userPage - 1) * ITEMS_PER_PAGE,
+    userPage * ITEMS_PER_PAGE
+  );
+
   const filteredCategories = initialCategories.filter((c) => {
     if (!searchCategory.trim()) return true;
     const q = searchCategory.toLowerCase();
     return c.name.toLowerCase().includes(q) || (c.description && c.description.toLowerCase().includes(q));
   });
 
+  const paginatedCategories = filteredCategories.slice(
+    (categoryPage - 1) * ITEMS_PER_PAGE,
+    categoryPage * ITEMS_PER_PAGE
+  );
+
   const filteredUnits = initialUnits.filter((u) => {
     if (!searchUnit.trim()) return true;
     const q = searchUnit.toLowerCase();
     return u.code.toLowerCase().includes(q) || u.name.toLowerCase().includes(q) || (u.description && u.description.toLowerCase().includes(q));
   });
+
+  const paginatedUnits = filteredUnits.slice(
+    (unitPage - 1) * ITEMS_PER_PAGE,
+    unitPage * ITEMS_PER_PAGE
+  );
 
   return (
     <div className="space-y-6">
@@ -180,7 +202,10 @@ export function SettingsManager({
               <input
                 type="text"
                 value={searchUser}
-                onChange={(e) => setSearchUser(e.target.value)}
+                onChange={(e) => {
+                  setSearchUser(e.target.value);
+                  setUserPage(1);
+                }}
                 placeholder="Buscar usuário por nome, e-mail ou cargo..."
                 className="w-full h-10 pl-9 pr-3 bg-slate-50 border border-slate-300 rounded-lg text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#B87A52]/40 focus:border-[#B87A52]"
               />
@@ -211,7 +236,7 @@ export function SettingsManager({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredUsers.map((u) => {
+                {paginatedUsers.map((u) => {
                   const roleBadge = ROLE_LABELS[u.role] || {
                     label: u.role,
                     bg: "bg-slate-100",
@@ -270,6 +295,12 @@ export function SettingsManager({
                 })}
               </tbody>
             </table>
+            <Pagination
+              currentPage={userPage}
+              totalItems={filteredUsers.length}
+              itemsPerPage={ITEMS_PER_PAGE}
+              onPageChange={setUserPage}
+            />
           </div>
         </div>
       )}
@@ -285,7 +316,10 @@ export function SettingsManager({
               <input
                 type="text"
                 value={searchCategory}
-                onChange={(e) => setSearchCategory(e.target.value)}
+                onChange={(e) => {
+                  setSearchCategory(e.target.value);
+                  setCategoryPage(1);
+                }}
                 placeholder="Buscar categoria por nome ou descrição..."
                 className="w-full h-10 pl-9 pr-3 bg-slate-50 border border-slate-300 rounded-lg text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#B87A52]/40 focus:border-[#B87A52]"
               />
@@ -315,7 +349,7 @@ export function SettingsManager({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredCategories.map((c) => (
+                {paginatedCategories.map((c) => (
                   <tr key={c.id} className="hover:bg-slate-50/60 transition-colors">
                     <td className="px-6 py-4 font-bold text-[#0B1730]">
                       <span className="px-2.5 py-1 rounded bg-slate-100 text-slate-800">
@@ -365,6 +399,12 @@ export function SettingsManager({
                 ))}
               </tbody>
             </table>
+            <Pagination
+              currentPage={categoryPage}
+              totalItems={filteredCategories.length}
+              itemsPerPage={ITEMS_PER_PAGE}
+              onPageChange={setCategoryPage}
+            />
           </div>
         </div>
       )}
@@ -380,7 +420,10 @@ export function SettingsManager({
               <input
                 type="text"
                 value={searchUnit}
-                onChange={(e) => setSearchUnit(e.target.value)}
+                onChange={(e) => {
+                  setSearchUnit(e.target.value);
+                  setUnitPage(1);
+                }}
                 placeholder="Buscar unidade por código ou descrição..."
                 className="w-full h-10 pl-9 pr-3 bg-slate-50 border border-slate-300 rounded-lg text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#B87A52]/40 focus:border-[#B87A52]"
               />
@@ -410,7 +453,7 @@ export function SettingsManager({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredUnits.map((u) => (
+                {paginatedUnits.map((u) => (
                   <tr key={u.id} className="hover:bg-slate-50/60 transition-colors">
                     <td className="px-6 py-4 font-mono font-bold text-[#14274B]">
                       <span className="px-2.5 py-1 rounded bg-[#14274B]/5 text-[#14274B] border border-[#14274B]/10">
@@ -460,6 +503,12 @@ export function SettingsManager({
                 ))}
               </tbody>
             </table>
+            <Pagination
+              currentPage={unitPage}
+              totalItems={filteredUnits.length}
+              itemsPerPage={ITEMS_PER_PAGE}
+              onPageChange={setUnitPage}
+            />
           </div>
         </div>
       )}

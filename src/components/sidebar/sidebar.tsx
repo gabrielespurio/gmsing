@@ -77,7 +77,7 @@ export function Sidebar({ user }: SidebarProps) {
   ];
 
   return (
-    <aside className="w-64 bg-[#0B1730] border-r border-[#1e345e] flex flex-col shrink-0 select-none text-slate-300">
+    <aside className="w-64 h-screen bg-[#0B1730] border-r border-[#1e345e] flex flex-col shrink-0 select-none text-slate-300 sticky top-0 overflow-hidden">
       {/* Brand header */}
       <div className="h-20 px-6 border-b border-[#1e345e] flex items-center gap-3">
         <div className="relative w-10 h-10 rounded-lg overflow-hidden border border-[#B87A52]/30 shadow-inner bg-slate-900 shrink-0">
@@ -141,7 +141,7 @@ export function Sidebar({ user }: SidebarProps) {
       </div>
 
       {/* User profile & Logout */}
-      <div className="p-4 border-t border-[#1e345e] bg-[#070e1e]">
+      <div className="p-4 border-t border-[#1e345e] bg-[#070e1e] shrink-0">
         <div className="flex items-center justify-between gap-3 mb-3">
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="w-8 h-8 rounded-full bg-[#14274B] border border-[#B87A52]/50 flex items-center justify-center text-xs font-bold text-[#E3B48A] shrink-0">
