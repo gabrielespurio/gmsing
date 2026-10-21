@@ -30,8 +30,22 @@ export interface MaterialData {
   active: boolean;
 }
 
+export interface CategoryOption {
+  id: string;
+  name: string;
+  description: string | null;
+}
+
+export interface UnitOption {
+  id: string;
+  code: string;
+  name: string;
+}
+
 interface StockManagerProps {
   initialMaterials: MaterialData[];
+  categories: CategoryOption[];
+  units: UnitOption[];
 }
 
 function formatCurrency(cents: number) {
@@ -41,7 +55,11 @@ function formatCurrency(cents: number) {
   }).format(cents / 100);
 }
 
-export function StockManager({ initialMaterials }: StockManagerProps) {
+export function StockManager({
+  initialMaterials,
+  categories,
+  units,
+}: StockManagerProps) {
   const [search, setSearch] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [editingMaterial, setEditingMaterial] = useState<MaterialData | null>(null);
@@ -313,18 +331,17 @@ export function StockManager({ initialMaterials }: StockManagerProps) {
                   </label>
                   <select
                     name="category"
-                    defaultValue={editingMaterial?.category || "ACM"}
+                    defaultValue={editingMaterial?.category || categories[0]?.name || "ACM"}
                     className="w-full h-9 px-3 bg-white border border-slate-300 rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#B87A52]/40 focus:border-[#B87A52]"
                   >
-                    <option value="ACM">ACM (Painel Alumínio)</option>
-                    <option value="Lona">Lona Frontlight / Backlight</option>
-                    <option value="Vinil">Vinil Adesivo</option>
-                    <option value="Metalon">Metalon / Tubos Galvanizados</option>
-                    <option value="LED">Módulos & Fitas LED</option>
-                    <option value="Acrílico">Chapas de Acrílico</option>
-                    <option value="Serralheria">Serralheria & Chapas Aço</option>
-                    <option value="Acessórios">Fontes, Parafusos e Fixadores</option>
-                    <option value="Outros">Outros</option>
+                    {categories.map((c) => (
+                      <option key={c.id} value={c.name}>
+                        {c.name} {c.description ? `(${c.description})` : ""}
+                      </option>
+                    ))}
+                    {editingMaterial && !categories.some((c) => c.name === editingMaterial.category) && (
+                      <option value={editingMaterial.category}>{editingMaterial.category}</option>
+                    )}
                   </select>
                 </div>
 
@@ -334,17 +351,17 @@ export function StockManager({ initialMaterials }: StockManagerProps) {
                   </label>
                   <select
                     name="unit"
-                    defaultValue={editingMaterial?.unit || "chapa"}
+                    defaultValue={editingMaterial?.unit || units[0]?.code || "chapa"}
                     className="w-full h-9 px-3 bg-white border border-slate-300 rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#B87A52]/40 focus:border-[#B87A52]"
                   >
-                    <option value="chapa">chapa (Chapa inteira)</option>
-                    <option value="m2">m² (Metro quadrado)</option>
-                    <option value="ml">ml (Metro linear)</option>
-                    <option value="barra">barra (Barra padrão)</option>
-                    <option value="un">un (Unidade)</option>
-                    <option value="litro">litro (Litro)</option>
-                    <option value="kg">kg (Quilograma)</option>
-                    <option value="rolo">rolo (Rolo)</option>
+                    {units.map((u) => (
+                      <option key={u.id} value={u.code}>
+                        {u.code} ({u.name})
+                      </option>
+                    ))}
+                    {editingMaterial && !units.some((u) => u.code === editingMaterial.unit) && (
+                      <option value={editingMaterial.unit}>{editingMaterial.unit}</option>
+                    )}
                   </select>
                 </div>
               </div>
