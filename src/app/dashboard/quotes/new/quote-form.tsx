@@ -48,12 +48,10 @@ export function QuoteForm({ clients, materials, products = [] }: QuoteFormProps)
 
   // Estado para adicionar item
   const [selectedCatalogId, setSelectedCatalogId] = useState("");
-  const [productName, setProductName] = useState("Fachada ACM com Letras Caixa LED");
+  const [productName, setProductName] = useState("");
+  const [productDescription, setProductDescription] = useState("");
   const [quantity, setQuantity] = useState("1");
-  const [widthMeters, setWidthMeters] = useState("6.00");
-  const [heightMeters, setHeightMeters] = useState("2.50");
-  const [selectedMaterialId, setSelectedMaterialId] = useState(materials[0]?.id || "");
-  const [markupPercent, setMarkupPercent] = useState("60");
+  const [unitPrice, setUnitPrice] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleCatalogSelect = (prodId: string) => {
@@ -62,76 +60,49 @@ export function QuoteForm({ clients, materials, products = [] }: QuoteFormProps)
     const prod = products.find((p) => p.id === prodId);
     if (prod) {
       setProductName(prod.name);
-      if (prod.markupPercent) {
-        setMarkupPercent(prod.markupPercent);
-      }
-      if (prod.unit === "un" || prod.unit === "hora" || prod.unit === "diaria") {
-        setWidthMeters("");
-        setHeightMeters("");
-      } else if (prod.unit === "m2" && (!widthMeters || !heightMeters)) {
-        setWidthMeters("2.00");
-        setHeightMeters("1.00");
+      setProductDescription(prod.description || "");
+      if (prod.salePriceCents) {
+        setUnitPrice((prod.salePriceCents / 100).toFixed(2));
       }
     }
   };
 
   // Lista de itens do orçamento
-  const [items, setItems] = useState<ItemPayload[]>([
-    {
-      productName: "Fachada ACM com Letras Caixa LED",
-      description: "Estrutura metálica galvanizada, revestimento em ACM 3mm e letras em acrílico com iluminação LED.",
-      quantity: 1,
-      widthMeters: 6.0,
-      heightMeters: 2.5,
-      unitArea: 15.0,
-      totalArea: 15.0,
-      pricingMethod: "composicao",
-      unitCostCents: 450000, // R$ 4.500,00
-      totalCostCents: 450000,
-      unitPriceCents: 720000, // R$ 7.200,00 (60% markup)
-      totalPriceCents: 720000,
-      notes: "Incluso instalação e fixação estrutural.",
-    },
-  ]);
-
-  // Cálculos dinâmicos do formulário de novo item
-  const parsedWidth = parseFloat(widthMeters) || 0;
-  const parsedHeight = parseFloat(heightMeters) || 0;
-  const parsedQty = parseInt(quantity, 10) || 1;
-  const unitAreaCalc = parsedWidth > 0 && parsedHeight > 0 ? Number((parsedWidth * parsedHeight).toFixed(3)) : 0;
-  const totalAreaCalc = Number((unitAreaCalc * parsedQty).toFixed(3));
-
-  const currentMat = materials.find((m) => m.id === selectedMaterialId);
-  const baseCostPerUnit = currentMat ? currentMat.costPriceCents : 25000;
-  const estimatedItemCostCents = unitAreaCalc > 0
-    ? Math.round(unitAreaCalc * baseCostPerUnit * 1.5) // Custo base + estrutura + mão de obra aproximada
-    : 15000;
-  const markupFactor = 1 + (parseFloat(markupPercent) || 50) / 100;
-  const estimatedItemPriceCents = Math.round(estimatedItemCostCents * markupFactor);
+  const [items, setItems] = useState<ItemPayload[]>([]);
 
   const handleAddItem = () => {
-    if (!productName.trim()) return;
+    if (!productName.trim()) {
+      alert("Informe o nome do produto ou serviço.");
+      return;
+    }
+
+    const priceNum = parseFloat(unitPrice.replace(",", ".")) || 0;
+    if (priceNum <= 0) {
+      alert("Informe um valor unitário válido maior que zero.");
+      return;
+    }
+
+    const parsedQty = parseInt(quantity, 10) || 1;
+    const priceCents = Math.round(priceNum * 100);
 
     const newItem: ItemPayload = {
       productName: productName.trim(),
-      description: `${parsedWidth > 0 ? `${parsedWidth}m x ${parsedHeight}m` : ""} - Material base: ${currentMat?.name || "Padrão"}`,
+      description: productDescription.trim(),
       quantity: parsedQty,
-      widthMeters: parsedWidth > 0 ? parsedWidth : undefined,
-      heightMeters: parsedHeight > 0 ? parsedHeight : undefined,
-      unitArea: unitAreaCalc > 0 ? unitAreaCalc : undefined,
-      totalArea: totalAreaCalc > 0 ? totalAreaCalc : undefined,
-      pricingMethod: "composicao",
-      unitCostCents: estimatedItemCostCents,
-      totalCostCents: estimatedItemCostCents * parsedQty,
-      unitPriceCents: estimatedItemPriceCents,
-      totalPriceCents: estimatedItemPriceCents * parsedQty,
+      pricingMethod: "manual",
+      unitCostCents: 0,
+      totalCostCents: 0,
+      unitPriceCents: priceCents,
+      totalPriceCents: priceCents * parsedQty,
       notes: "",
     };
 
     setItems([...items, newItem]);
     setProductName("");
-    setWidthMeters("");
-    setHeightMeters("");
+    setProductDescription("");
+    setQuantity("1");
+    setUnitPrice("");
+    setSelectedCatalogId("");
   };
 
   const handleRemoveItem = (index: number) => {
@@ -139,10 +110,7 @@ export function QuoteForm({ clients, materials, products = [] }: QuoteFormProps)
   };
 
   // Totais globais
-  const totalCost = items.reduce((acc, it) => acc + it.totalCostCents, 0);
   const totalPrice = items.reduce((acc, it) => acc + it.totalPriceCents, 0);
-  const grossProfit = totalPrice - totalCost;
-  const grossMargin = totalPrice > 0 ? Math.round((grossProfit / totalPrice) * 100) : 0;
 
   const formatBRL = (cents: number) => {
     return new Intl.NumberFormat("pt-BR", {
@@ -231,24 +199,24 @@ export function QuoteForm({ clients, materials, products = [] }: QuoteFormProps)
         </div>
       </div>
 
-      {/* Precificação e Adição de Itens Técnicos */}
+      {/* Serviços e Itens do Orçamento */}
       <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-2xs space-y-4">
         <h2 className="text-base font-semibold text-slate-800 border-b border-slate-100 pb-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Calculator className="w-4 h-4 text-[#B87A52]" />
-            <span>2. Motor de Precificação Técnica & Produtos</span>
+            <span>2. Serviços e Itens do Orçamento</span>
           </div>
           <span className="text-xs text-slate-500 font-normal">
-            Área, materiais e margem calculados em tempo real
+            Descreva o serviço a ser executado e informe o valor manual
           </span>
         </h2>
 
-        {/* Seletor Rápido de Catálogo de Produtos & Serviços */}
+        {/* Seletor Opcional de Catálogo de Produtos & Serviços */}
         {products.length > 0 && (
           <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 p-3 bg-white rounded-lg border border-slate-200 shadow-2xs">
             <span className="text-xs font-bold text-[#0B1730] flex items-center gap-1.5 shrink-0">
               <Boxes className="w-4 h-4 text-[#B87A52]" />
-              <span>Carregar do Catálogo:</span>
+              <span>Carregar do Catálogo (Opcional):</span>
             </span>
             <select
               value={selectedCatalogId}
@@ -266,113 +234,87 @@ export function QuoteForm({ clients, materials, products = [] }: QuoteFormProps)
         )}
 
         {/* Linha de configuração do novo item */}
-        <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-4">
+        <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3.5">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
             <div className="md:col-span-2">
-              <label className="block text-xs font-semibold text-slate-600 mb-1">
-                Descrição do Produto / Serviço *
+              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                Nome do Serviço / Produto *
               </label>
               <input
                 type="text"
                 value={productName}
                 onChange={(e) => setProductName(e.target.value)}
-                placeholder="Ex: Fachada ACM, Banner Lona, Letra Caixa..."
-                className="w-full h-9 px-3 bg-white border border-slate-300 rounded-md text-sm text-slate-800"
+                placeholder="Ex: Fachada ACM com Letras Caixa LED"
+                className="w-full h-9 px-3 bg-white border border-slate-300 rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#B87A52]/40"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">
-                Material / Categoria Base
-              </label>
-              <select
-                value={selectedMaterialId}
-                onChange={(e) => setSelectedMaterialId(e.target.value)}
-                className="w-full h-9 px-3 bg-white border border-slate-300 rounded-md text-sm text-slate-800"
-              >
-                {materials.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.name} ({formatBRL(m.costPriceCents)}/{m.unit})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">
-                Quantidade
+              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                Quantidade *
               </label>
               <input
                 type="number"
                 min="1"
                 value={quantity}
                 onChange={(e) => setQuantity(e.target.value)}
-                className="w-full h-9 px-3 bg-white border border-slate-300 rounded-md text-sm text-slate-800"
+                className="w-full h-9 px-3 bg-white border border-slate-300 rounded-lg text-sm text-slate-800 font-mono text-center focus:outline-none focus:ring-2 focus:ring-[#B87A52]/40"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                Valor Unitário (R$) *
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={unitPrice}
+                onChange={(e) => setUnitPrice(e.target.value)}
+                placeholder="0,00"
+                className="w-full h-9 px-3 bg-white border border-slate-300 rounded-lg text-sm text-slate-800 font-mono font-bold focus:outline-none focus:ring-2 focus:ring-[#B87A52]/40"
               />
             </div>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 items-end">
-            <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">
-                Largura (m)
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                placeholder="0.00"
-                value={widthMeters}
-                onChange={(e) => setWidthMeters(e.target.value)}
-                className="w-full h-9 px-3 bg-white border border-slate-300 rounded-md text-sm text-slate-800"
-              />
+          {/* Descrição Detalhada em Textarea */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+              Descrição do que será feito no serviço *
+            </label>
+            <textarea
+              rows={3}
+              value={productDescription}
+              onChange={(e) => setProductDescription(e.target.value)}
+              placeholder="Informe detalhadamente o que será executado: materiais, medidas, acabamento, estrutura, iluminação, se inclui instalação, etc."
+              className="w-full p-3 bg-white border border-slate-300 rounded-lg text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#B87A52]/40 leading-relaxed"
+            />
+          </div>
+
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-slate-200/80">
+            <div className="text-xs text-slate-600">
+              {parseFloat(unitPrice) > 0 ? (
+                <span>
+                  Subtotal deste item:{" "}
+                  <strong className="text-slate-900 font-mono text-sm">
+                    {formatBRL(Math.round((parseFloat(unitPrice.replace(",", ".")) || 0) * (parseInt(quantity, 10) || 1) * 100))}
+                  </strong>
+                </span>
+              ) : (
+                <span className="text-slate-400">Preencha o serviço, descrição e valor unitário acima.</span>
+              )}
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">
-                Altura (m)
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                placeholder="0.00"
-                value={heightMeters}
-                onChange={(e) => setHeightMeters(e.target.value)}
-                className="w-full h-9 px-3 bg-white border border-slate-300 rounded-md text-sm text-slate-800"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">
-                Área Total
-              </label>
-              <div className="h-9 px-3 bg-slate-200/70 border border-slate-300 rounded-md text-sm text-slate-700 flex items-center font-mono font-medium">
-                {totalAreaCalc > 0 ? `${totalAreaCalc} m²` : "-"}
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">
-                Markup / Lucro (%)
-              </label>
-              <input
-                type="number"
-                step="1"
-                value={markupPercent}
-                onChange={(e) => setMarkupPercent(e.target.value)}
-                className="w-full h-9 px-3 bg-white border border-slate-300 rounded-md text-sm text-slate-800"
-              />
-            </div>
-
-            <div>
-              <button
-                type="button"
-                onClick={handleAddItem}
-                className="w-full h-9 bg-[#14274B] hover:bg-[#0B1730] text-white rounded-md text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors shadow-2xs"
-              >
-                <Plus className="w-3.5 h-3.5 text-[#E3B48A]" />
-                <span>Adicionar Item</span>
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={handleAddItem}
+              disabled={!productName.trim() || !unitPrice || parseFloat(unitPrice.replace(",", ".")) <= 0}
+              className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg bg-[#0B1730] hover:bg-[#14274B] disabled:opacity-50 text-white font-semibold text-xs transition-colors shadow-2xs cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5 text-[#E3B48A]" />
+              <span>Adicionar Item ao Orçamento</span>
+            </button>
           </div>
         </div>
 
@@ -381,19 +323,17 @@ export function QuoteForm({ clients, materials, products = [] }: QuoteFormProps)
           <table className="w-full text-left text-sm text-slate-700">
             <thead className="bg-slate-50 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200">
               <tr>
-                <th className="px-4 py-3">Produto / Especificação</th>
-                <th className="px-4 py-3">Dimensões</th>
+                <th className="px-4 py-3">Item / Serviço & Detalhes da Execução</th>
                 <th className="px-4 py-3 text-center">Qtd</th>
-                <th className="px-4 py-3 text-right">Custo Est.</th>
-                <th className="px-4 py-3 text-right">Preço Venda</th>
-                <th className="px-4 py-3 text-right">Total</th>
+                <th className="px-4 py-3 text-right">Valor Unitário</th>
+                <th className="px-4 py-3 text-right">Valor Total</th>
                 <th className="px-4 py-3 text-center">Ação</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {items.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-sm text-slate-400">
+                  <td colSpan={5} className="px-4 py-8 text-center text-sm text-slate-400">
                     Nenhum item adicionado à proposta técnica.
                   </td>
                 </tr>
@@ -403,19 +343,13 @@ export function QuoteForm({ clients, materials, products = [] }: QuoteFormProps)
                     <td className="px-4 py-3">
                       <div className="font-semibold text-slate-900">{item.productName}</div>
                       {item.description && (
-                        <div className="text-xs text-slate-400">{item.description}</div>
+                        <div className="text-xs text-slate-600 mt-1 whitespace-pre-line bg-slate-50 p-2.5 rounded-lg border border-slate-200/60">
+                          {item.description}
+                        </div>
                       )}
                     </td>
-                    <td className="px-4 py-3 font-mono text-xs text-slate-600">
-                      {item.widthMeters && item.heightMeters
-                        ? `${item.widthMeters}m x ${item.heightMeters}m (${item.totalArea}m²)`
-                        : "Unidade"}
-                    </td>
-                    <td className="px-4 py-3 text-center font-medium">{item.quantity}</td>
-                    <td className="px-4 py-3 text-right text-slate-500 font-mono text-xs">
-                      {formatBRL(item.totalCostCents)}
-                    </td>
-                    <td className="px-4 py-3 text-right text-slate-800 font-mono text-xs">
+                    <td className="px-4 py-3 text-center font-medium font-mono">{item.quantity} un</td>
+                    <td className="px-4 py-3 text-right text-slate-600 font-mono text-xs">
                       {formatBRL(item.unitPriceCents)}
                     </td>
                     <td className="px-4 py-3 text-right font-bold text-[#14274B] font-mono">
@@ -425,7 +359,8 @@ export function QuoteForm({ clients, materials, products = [] }: QuoteFormProps)
                       <button
                         type="button"
                         onClick={() => handleRemoveItem(idx)}
-                        className="p-1 text-slate-400 hover:text-rose-600 transition-colors"
+                        className="p-1.5 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer rounded hover:bg-rose-50"
+                        title="Remover Item"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -446,12 +381,8 @@ export function QuoteForm({ clients, materials, products = [] }: QuoteFormProps)
           </span>
           <div className="flex items-baseline gap-6 text-sm">
             <div>
-              <span className="text-slate-400 text-xs block">Custo Estimado:</span>
-              <strong className="text-slate-200 font-mono text-base">{formatBRL(totalCost)}</strong>
-            </div>
-            <div>
-              <span className="text-slate-400 text-xs block">Lucro Bruto:</span>
-              <strong className="text-emerald-400 font-mono text-base">{formatBRL(grossProfit)} ({grossMargin}%)</strong>
+              <span className="text-slate-400 text-xs block">Itens / Serviços:</span>
+              <strong className="text-slate-200 font-mono text-base">{items.length} {items.length === 1 ? "item" : "itens"}</strong>
             </div>
             <div>
               <span className="text-slate-400 text-xs block">Valor Total do Orçamento:</span>
