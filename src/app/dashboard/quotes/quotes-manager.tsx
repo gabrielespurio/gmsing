@@ -34,6 +34,9 @@ export interface ClientOption {
   name: string;
   tradeName: string | null;
   document: string | null;
+  address?: string | null;
+  city?: string | null;
+  state?: string | null;
 }
 
 export interface MaterialOption {
@@ -103,17 +106,37 @@ export function QuotesManager({
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 10;
 
-  // Estados do Formulário de Orçamento (Modal)
-  const [selectedClient, setSelectedClient] = useState(clients[0]?.id || "");
-  const [validityDays, setValidityDays] = useState("10");
-  const [deliveryTimeDays, setDeliveryTimeDays] = useState("15");
-  const [paymentConditions, setPaymentConditions] = useState("50% de entrada e 50% na conclusão da instalação.");
+  // Estados do Formulário de Orçamento (Padrão Proposta GM Sign Solutions)
+  const initialClient = clients[0];
+  const initialAddr = initialClient
+    ? [initialClient.address, initialClient.city && initialClient.state ? `${initialClient.city}/${initialClient.state}` : initialClient.city].filter(Boolean).join(" — ")
+    : "";
+
+  const [selectedClient, setSelectedClient] = useState(initialClient?.id || "");
+  const [title, setTitle] = useState("COMUNICAÇÃO VISUAL — PROPOSTA DE FORNECIMENTO");
+  const [contactPerson, setContactPerson] = useState("");
+  const [billingAddress, setBillingAddress] = useState(initialAddr);
+  const [installationAddress, setInstallationAddress] = useState(initialAddr);
+  const [cityStateLocation, setCityStateLocation] = useState("São José do Rio Preto/SP");
+  const [validityDays, setValidityDays] = useState("30");
+  const [deliveryTimeDays, setDeliveryTimeDays] = useState("30");
+  const [paymentConditions, setPaymentConditions] = useState(
+    "50% no aceite formal da proposta e 50% após a conclusão e validação da instalação, mediante emissão de Nota Fiscal Eletrônica."
+  );
+  const [includedServices, setIncludedServices] = useState(
+    "Usinagens técnicas, subestrutura metálica, equipe especializada de instalação e limpeza pós-obra."
+  );
+  const [warrantyTerms, setWarrantyTerms] = useState(
+    "12 (doze) meses contra defeitos de fabricação mecânica, ancoragem e integridade dos materiais."
+  );
   const [commercialNotes, setCommercialNotes] = useState("");
   const [internalNotes, setInternalNotes] = useState("");
 
   // Estados de Adição de Item / Serviço
   const [selectedCatalogId, setSelectedCatalogId] = useState("");
   const [productName, setProductName] = useState("");
+  const [dimensions, setDimensions] = useState("");
+  const [summaryDescription, setSummaryDescription] = useState("");
   const [productDescription, setProductDescription] = useState("");
   const [quantity, setQuantity] = useState("1");
   const [unitPrice, setUnitPrice] = useState("");
@@ -154,12 +177,30 @@ export function QuotesManager({
     currentPage * ITEMS_PER_PAGE
   );
 
+  const handleClientChange = (cId: string) => {
+    setSelectedClient(cId);
+    const clientObj = clients.find((c) => c.id === cId);
+    if (clientObj) {
+      const formattedAddr = [
+        clientObj.address,
+        clientObj.city && clientObj.state ? `${clientObj.city}/${clientObj.state}` : clientObj.city,
+      ]
+        .filter(Boolean)
+        .join(" — ");
+      if (formattedAddr) {
+        setBillingAddress(formattedAddr);
+        setInstallationAddress(formattedAddr);
+      }
+    }
+  };
+
   const handleCatalogSelect = (prodId: string) => {
     setSelectedCatalogId(prodId);
     if (!prodId) return;
     const prod = products.find((p) => p.id === prodId);
     if (prod) {
       setProductName(prod.name);
+      setSummaryDescription(prod.name);
       setProductDescription(prod.description || "");
       if (prod.salePriceCents) {
         setUnitPrice((prod.salePriceCents / 100).toFixed(2));
@@ -184,6 +225,8 @@ export function QuotesManager({
 
     const newItem: ItemPayload = {
       productName: productName.trim(),
+      dimensions: dimensions.trim() || undefined,
+      summaryDescription: summaryDescription.trim() || productName.trim(),
       description: productDescription.trim(),
       quantity: parsedQty,
       pricingMethod: "manual",
@@ -196,6 +239,8 @@ export function QuotesManager({
 
     setItems([...items, newItem]);
     setProductName("");
+    setDimensions("");
+    setSummaryDescription("");
     setProductDescription("");
     setQuantity("1");
     setUnitPrice("");
@@ -210,14 +255,34 @@ export function QuotesManager({
   const totalPrice = items.reduce((acc, it) => acc + it.totalPriceCents, 0);
 
   const handleOpenCreate = () => {
-    setSelectedClient(clients[0]?.id || "");
-    setValidityDays("10");
-    setDeliveryTimeDays("15");
-    setPaymentConditions("50% de entrada e 50% na conclusão da instalação.");
+    const firstClient = clients[0];
+    const firstAddr = firstClient
+      ? [firstClient.address, firstClient.city && firstClient.state ? `${firstClient.city}/${firstClient.state}` : firstClient.city].filter(Boolean).join(" — ")
+      : "";
+
+    setSelectedClient(firstClient?.id || "");
+    setTitle("COMUNICAÇÃO VISUAL — PROPOSTA DE FORNECIMENTO");
+    setContactPerson("");
+    setBillingAddress(firstAddr);
+    setInstallationAddress(firstAddr);
+    setCityStateLocation("São José do Rio Preto/SP");
+    setValidityDays("30");
+    setDeliveryTimeDays("30");
+    setPaymentConditions(
+      "50% no aceite formal da proposta e 50% após a conclusão e validação da instalação, mediante emissão de Nota Fiscal Eletrônica."
+    );
+    setIncludedServices(
+      "Usinagens técnicas, subestrutura metálica, equipe especializada de instalação e limpeza pós-obra."
+    );
+    setWarrantyTerms(
+      "12 (doze) meses contra defeitos de fabricação mecânica, ancoragem e integridade dos materiais."
+    );
     setCommercialNotes("");
     setInternalNotes("");
     setSelectedCatalogId("");
     setProductName("");
+    setDimensions("");
+    setSummaryDescription("");
     setProductDescription("");
     setQuantity("1");
     setUnitPrice("");
@@ -247,9 +312,16 @@ export function QuotesManager({
     try {
       const formData = new FormData();
       formData.set("clientId", selectedClient);
+      formData.set("title", title);
+      formData.set("contactPerson", contactPerson);
+      formData.set("billingAddress", billingAddress);
+      formData.set("installationAddress", installationAddress);
+      formData.set("cityStateLocation", cityStateLocation);
       formData.set("validityDays", validityDays);
       formData.set("deliveryTimeDays", deliveryTimeDays);
       formData.set("paymentConditions", paymentConditions);
+      formData.set("includedServices", includedServices);
+      formData.set("warrantyTerms", warrantyTerms);
       formData.set("commercialNotes", commercialNotes);
       formData.set("internalNotes", internalNotes);
       formData.set("items", JSON.stringify(items));
@@ -474,10 +546,10 @@ export function QuotesManager({
                 </div>
                 <div>
                   <h3 className="font-bold text-slate-900 text-base">
-                    Novo Orçamento Técnico
+                    Nova Proposta Comercial (Padrão GM Sign)
                   </h3>
                   <p className="text-xs text-slate-500">
-                    Configure dimensões, materiais, perdas e margem de lucro para comunicação visual.
+                    Estrutura com Escopo do Fornecimento, Tabela de Investimento, Condições e Aceite Formal.
                   </p>
                 </div>
               </div>
@@ -493,23 +565,37 @@ export function QuotesManager({
             {/* Formulário com Scroll Interno */}
             <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0 overflow-hidden">
               <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
-                {/* 1. Dados Gerais da Proposta */}
+                {/* 1. Identificação da Proposta & Cliente */}
                 <div className="bg-slate-50/70 p-5 rounded-xl border border-slate-200 space-y-4">
                   <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2 border-b border-slate-200 pb-2">
                     <span className="w-5 h-5 rounded-full bg-[#0B1730] text-white text-[11px] flex items-center justify-center font-bold">
                       1
                     </span>
-                    <span>Dados Gerais da Proposta</span>
+                    <span>Identificação da Proposta & Destinatário</span>
                   </h4>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="md:col-span-1">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+                        Título / Subtítulo da Proposta *
+                      </label>
+                      <input
+                        type="text"
+                        value={title}
+                        onChange={(e) => setTitle(e.target.value)}
+                        required
+                        placeholder="Ex: COMUNICAÇÃO VISUAL — COMARCA DE MONTE APRAZÍVEL"
+                        className="w-full h-10 px-3 bg-white border border-slate-300 rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#B87A52]/40"
+                      />
+                    </div>
+
+                    <div>
                       <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
                         Cliente Destinatário *
                       </label>
                       <select
                         value={selectedClient}
-                        onChange={(e) => setSelectedClient(e.target.value)}
+                        onChange={(e) => handleClientChange(e.target.value)}
                         required
                         className="w-full h-10 px-3 bg-white border border-slate-300 rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#B87A52]/40"
                       >
@@ -520,86 +606,76 @@ export function QuotesManager({
                         ))}
                       </select>
                     </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-                        Validade da Proposta (Dias)
-                      </label>
-                      <input
-                        type="number"
-                        min="1"
-                        value={validityDays}
-                        onChange={(e) => setValidityDays(e.target.value)}
-                        className="w-full h-10 px-3 bg-white border border-slate-300 rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#B87A52]/40"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-                        Prazo de Entrega (Dias Úteis)
-                      </label>
-                      <input
-                        type="number"
-                        min="1"
-                        value={deliveryTimeDays}
-                        onChange={(e) => setDeliveryTimeDays(e.target.value)}
-                        className="w-full h-10 px-3 bg-white border border-slate-300 rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#B87A52]/40"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-                      Condições Comerciais e de Pagamento Padrão
-                    </label>
-                    <input
-                      type="text"
-                      value={paymentConditions}
-                      onChange={(e) => setPaymentConditions(e.target.value)}
-                      placeholder="Ex: 50% de entrada e 50% na conclusão da instalação."
-                      className="w-full h-10 px-3 bg-white border border-slate-300 rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#B87A52]/40"
-                    />
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-                        Observações Comerciais (visível ao cliente)
+                        A/C (Aos Cuidados / Contato Responsável)
                       </label>
-                      <textarea
-                        rows={2}
-                        value={commercialNotes}
-                        onChange={(e) => setCommercialNotes(e.target.value)}
-                        placeholder="Ex: Incluso frete e içamento até o 2º andar..."
-                        className="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#B87A52]/40"
+                      <input
+                        type="text"
+                        value={contactPerson}
+                        onChange={(e) => setContactPerson(e.target.value)}
+                        placeholder="Ex: Sr. Reginaldo Fernando Salvioni — Chefe de Seção Judiciário"
+                        className="w-full h-10 px-3 bg-white border border-slate-300 rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#B87A52]/40"
                       />
                     </div>
+
                     <div>
                       <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-                        Observações Internas (produção / equipe)
+                        Cidade / Localidade de Emissão
                       </label>
-                      <textarea
-                        rows={2}
-                        value={internalNotes}
-                        onChange={(e) => setInternalNotes(e.target.value)}
-                        placeholder="Ex: Verificar ponto de energia 220v no local..."
-                        className="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#B87A52]/40"
+                      <input
+                        type="text"
+                        value={cityStateLocation}
+                        onChange={(e) => setCityStateLocation(e.target.value)}
+                        placeholder="Ex: São José do Rio Preto/SP"
+                        className="w-full h-10 px-3 bg-white border border-slate-300 rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#B87A52]/40"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+                        Endereço de Faturamento
+                      </label>
+                      <input
+                        type="text"
+                        value={billingAddress}
+                        onChange={(e) => setBillingAddress(e.target.value)}
+                        placeholder="Ex: Rua Monteiro Lobato, nº 269 — Centro — Monte Aprazível/SP"
+                        className="w-full h-10 px-3 bg-white border border-slate-300 rounded-lg text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#B87A52]/40"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+                        Endereço de Instalação / Obra
+                      </label>
+                      <input
+                        type="text"
+                        value={installationAddress}
+                        onChange={(e) => setInstallationAddress(e.target.value)}
+                        placeholder="Ex: Av. Antônio Canheo, nº 429 — Monte Aprazível/SP"
+                        className="w-full h-10 px-3 bg-white border border-slate-300 rounded-lg text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#B87A52]/40"
                       />
                     </div>
                   </div>
                 </div>
 
-                {/* 2. Serviços e Itens do Orçamento */}
+                {/* 2. Escopo do Fornecimento & Investimento */}
                 <div className="bg-slate-50/70 p-5 rounded-xl border border-slate-200 space-y-4">
                   <div className="flex items-center justify-between border-b border-slate-200 pb-2">
                     <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2">
                       <span className="w-5 h-5 rounded-full bg-[#B87A52] text-white text-[11px] flex items-center justify-center font-bold">
                         2
                       </span>
-                      <span>Serviços e Itens do Orçamento</span>
+                      <span>Itens da Proposta (Escopo & Investimento)</span>
                     </h4>
                     <span className="text-xs text-slate-500 font-normal">
-                      Descreva o serviço a ser executado e informe o valor manual
+                      Preencha o item técnico, dimensões e detalhamento de execução
                     </span>
                   </div>
 
@@ -627,35 +703,48 @@ export function QuotesManager({
 
                   {/* Construtor de Item / Serviço */}
                   <div className="p-4 bg-white rounded-xl border border-slate-200 space-y-3.5">
-                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                      <div className="sm:col-span-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+                      <div className="sm:col-span-6">
                         <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                          Nome do Serviço / Produto *
+                          Título do Item (Escopo) *
                         </label>
                         <input
                           type="text"
                           value={productName}
                           onChange={(e) => setProductName(e.target.value)}
-                          placeholder="Ex: Fachada ACM com Letras Caixa LED"
+                          placeholder="Ex: Placa de Fachada Externa"
                           className="w-full h-9 px-3 bg-slate-50 border border-slate-300 rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#B87A52]/40"
                         />
                       </div>
 
-                      <div>
+                      <div className="sm:col-span-3">
                         <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                          Quantidade *
+                          Dimensões
+                        </label>
+                        <input
+                          type="text"
+                          value={dimensions}
+                          onChange={(e) => setDimensions(e.target.value)}
+                          placeholder="Ex: 500 × 66 cm"
+                          className="w-full h-9 px-3 bg-slate-50 border border-slate-300 rounded-lg text-sm text-slate-800 font-mono focus:outline-none focus:ring-2 focus:ring-[#B87A52]/40"
+                        />
+                      </div>
+
+                      <div className="sm:col-span-1">
+                        <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1 text-center">
+                          Qtd *
                         </label>
                         <input
                           type="number"
                           min="1"
                           value={quantity}
                           onChange={(e) => setQuantity(e.target.value)}
-                          className="w-full h-9 px-3 bg-slate-50 border border-slate-300 rounded-lg text-sm text-slate-800 font-mono text-center focus:outline-none focus:ring-2 focus:ring-[#B87A52]/40"
+                          className="w-full h-9 px-2 bg-slate-50 border border-slate-300 rounded-lg text-sm text-slate-800 font-mono text-center focus:outline-none focus:ring-2 focus:ring-[#B87A52]/40"
                         />
                       </div>
 
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                      <div className="sm:col-span-2">
+                        <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1 text-right">
                           Valor Unitário (R$) *
                         </label>
                         <input
@@ -665,21 +754,34 @@ export function QuotesManager({
                           value={unitPrice}
                           onChange={(e) => setUnitPrice(e.target.value)}
                           placeholder="0,00"
-                          className="w-full h-9 px-3 bg-slate-50 border border-slate-300 rounded-lg text-sm text-slate-800 font-mono font-bold focus:outline-none focus:ring-2 focus:ring-[#B87A52]/40"
+                          className="w-full h-9 px-3 bg-slate-50 border border-slate-300 rounded-lg text-sm text-slate-800 font-mono font-bold text-right focus:outline-none focus:ring-2 focus:ring-[#B87A52]/40"
                         />
                       </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                        Resumo Comercial (para Tabela de Investimento)
+                      </label>
+                      <input
+                        type="text"
+                        value={summaryDescription}
+                        onChange={(e) => setSummaryDescription(e.target.value)}
+                        placeholder="Ex: Placa de fachada em ACM, subestrutura, vinil e instalação (se vazio, usa o título do item)"
+                        className="w-full h-9 px-3 bg-slate-50 border border-slate-300 rounded-lg text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#B87A52]/40"
+                      />
                     </div>
 
                     {/* Descrição Detalhada em Textarea */}
                     <div>
                       <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                        Descrição do que será feito no serviço *
+                        Descrição Técnica Detalhada (para Escopo do Fornecimento) *
                       </label>
                       <textarea
                         rows={3}
                         value={productDescription}
                         onChange={(e) => setProductDescription(e.target.value)}
-                        placeholder="Informe detalhadamente o que será executado: materiais, medidas, acabamento, estrutura, iluminação, se inclui instalação, etc."
+                        placeholder="Ex: ACM branco 3 mm usinado e dobrado em bandeja, subestrutura em aço galvanizado com acabamento anticorrosivo, identificação em vinil de alta performance, nivelamento, fixação mecânica e instalação."
                         className="w-full p-3 bg-slate-50 border border-slate-300 rounded-lg text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#B87A52]/40 leading-relaxed"
                       />
                     </div>
@@ -695,7 +797,7 @@ export function QuotesManager({
                             </strong>
                           </span>
                         ) : (
-                          <span className="text-slate-400">Preencha o serviço, descrição e valor unitário acima.</span>
+                          <span className="text-slate-400">Preencha o item, descrição e valor unitário acima.</span>
                         )}
                       </div>
 
@@ -716,7 +818,8 @@ export function QuotesManager({
                     <table className="w-full text-left text-xs text-slate-600">
                       <thead className="bg-slate-100 text-slate-600 uppercase font-semibold border-b border-slate-200">
                         <tr>
-                          <th className="px-3.5 py-2.5">Item / Serviço & Detalhes da Execução</th>
+                          <th className="px-3 py-2 text-center w-12">Item</th>
+                          <th className="px-3.5 py-2.5">Escopo Técnico & Detalhamento</th>
                           <th className="px-3.5 py-2.5 text-center">Qtd</th>
                           <th className="px-3.5 py-2.5 text-right">Valor Unitário</th>
                           <th className="px-3.5 py-2.5 text-right">Valor Total</th>
@@ -726,15 +829,25 @@ export function QuotesManager({
                       <tbody className="divide-y divide-slate-100">
                         {items.length === 0 ? (
                           <tr>
-                            <td colSpan={5} className="py-8 text-center text-slate-400">
+                            <td colSpan={6} className="py-8 text-center text-slate-400">
                               Nenhum item adicionado ainda. Preencha os campos acima e clique em "Adicionar Item ao Orçamento".
                             </td>
                           </tr>
                         ) : (
                           items.map((item, idx) => (
                             <tr key={idx} className="hover:bg-slate-50/70">
+                              <td className="px-3 py-3 text-center font-bold font-mono text-slate-800">
+                                {String(idx + 1).padStart(2, "0")}
+                              </td>
                               <td className="px-3.5 py-3">
-                                <div className="font-bold text-slate-900 text-sm">{item.productName}</div>
+                                <div className="font-bold text-slate-900 text-sm">
+                                  {item.productName} {item.dimensions ? `— ${item.dimensions}` : ""}
+                                </div>
+                                {item.summaryDescription && item.summaryDescription !== item.productName && (
+                                  <div className="text-[11px] text-[#B87A52] font-medium mt-0.5">
+                                    Resumo Investimento: {item.summaryDescription}
+                                  </div>
+                                )}
                                 {item.description && (
                                   <div className="text-xs text-slate-600 mt-1 whitespace-pre-line bg-slate-50 p-2.5 rounded-lg border border-slate-200/60">
                                     {item.description}
@@ -768,7 +881,86 @@ export function QuotesManager({
                   </div>
                 </div>
 
-                {/* 3. Resumo da Proposta Comercial */}
+                {/* 3. Condições Comerciais Padrão */}
+                <div className="bg-slate-50/70 p-5 rounded-xl border border-slate-200 space-y-4">
+                  <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2 border-b border-slate-200 pb-2">
+                    <span className="w-5 h-5 rounded-full bg-[#0B1730] text-white text-[11px] flex items-center justify-center font-bold">
+                      3
+                    </span>
+                    <span>Condições Comerciais & Aceite</span>
+                  </h4>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+                        Serviços Inclusos
+                      </label>
+                      <input
+                        type="text"
+                        value={includedServices}
+                        onChange={(e) => setIncludedServices(e.target.value)}
+                        placeholder="Ex: Usinagens técnicas, subestrutura metálica, equipe especializada de instalação e limpeza pós-obra."
+                        className="w-full h-10 px-3 bg-white border border-slate-300 rounded-lg text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#B87A52]/40"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+                        Condições de Pagamento
+                      </label>
+                      <input
+                        type="text"
+                        value={paymentConditions}
+                        onChange={(e) => setPaymentConditions(e.target.value)}
+                        placeholder="Ex: 50% no aceite formal da proposta e 50% após a conclusão..."
+                        className="w-full h-10 px-3 bg-white border border-slate-300 rounded-lg text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#B87A52]/40"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+                        Prazo de Fabricação / Instalação (Dias)
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={deliveryTimeDays}
+                        onChange={(e) => setDeliveryTimeDays(e.target.value)}
+                        className="w-full h-10 px-3 bg-white border border-slate-300 rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#B87A52]/40"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+                        Validade da Proposta (Dias)
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={validityDays}
+                        onChange={(e) => setValidityDays(e.target.value)}
+                        className="w-full h-10 px-3 bg-white border border-slate-300 rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#B87A52]/40"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+                        Garantia Técnica
+                      </label>
+                      <input
+                        type="text"
+                        value={warrantyTerms}
+                        onChange={(e) => setWarrantyTerms(e.target.value)}
+                        placeholder="Ex: 12 (doze) meses..."
+                        className="w-full h-10 px-3 bg-white border border-slate-300 rounded-lg text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#B87A52]/40"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* 4. Resumo da Proposta Comercial */}
                 <div className="bg-[#0B1730] text-white p-5 rounded-xl border border-[#1e345e] shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="space-y-1">
                     <span className="text-xs font-semibold text-[#E3B48A] uppercase tracking-wider">
@@ -776,11 +968,11 @@ export function QuotesManager({
                     </span>
                     <div className="flex flex-wrap items-baseline gap-6 text-xs">
                       <div>
-                        <span className="text-slate-400 block">Itens / Serviços:</span>
+                        <span className="text-slate-400 block">Itens do Fornecimento:</span>
                         <strong className="text-slate-200 font-mono text-sm">{items.length} {items.length === 1 ? "item" : "itens"}</strong>
                       </div>
                       <div>
-                        <span className="text-slate-400 block">Total do Orçamento:</span>
+                        <span className="text-slate-400 block">Total do Investimento:</span>
                         <strong className="text-2xl font-bold text-white font-mono">{formatCurrency(totalPrice)}</strong>
                       </div>
                     </div>

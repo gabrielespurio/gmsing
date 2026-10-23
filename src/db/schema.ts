@@ -143,6 +143,13 @@ export const quotes = pgTable("quotes", {
   status: varchar("status", { length: 50 }).default("rascunho").notNull(), // rascunho, enviado, negociacao, aprovado, recusado, cancelado
   issueDate: timestamp("issue_date").defaultNow().notNull(),
   validUntil: timestamp("valid_until").notNull(),
+  title: varchar("title", { length: 255 }), // ex: "COMUNICAÇÃO VISUAL — COMARCA DE MONTE APRAZÍVEL"
+  contactPerson: varchar("contact_person", { length: 255 }), // ex: "A/C: Sr. Reginaldo Fernando Salvioni — Chefe de Seção Judiciário"
+  billingAddress: text("billing_address"),
+  installationAddress: text("installation_address"),
+  includedServices: text("included_services"),
+  warrantyTerms: text("warranty_terms"),
+  cityStateLocation: varchar("city_state_location", { length: 100 }).default("São José do Rio Preto/SP"),
   paymentConditions: text("payment_conditions"),
   deliveryTimeDays: integer("delivery_time_days").default(15),
   commercialNotes: text("commercial_notes"),
@@ -160,7 +167,9 @@ export const quoteItems = pgTable("quote_items", {
   id: uuid("id").defaultRandom().primaryKey(),
   quoteId: uuid("quote_id").references(() => quotes.id).notNull(),
   productName: varchar("product_name", { length: 255 }).notNull(),
-  description: text("description"),
+  dimensions: varchar("dimensions", { length: 100 }), // ex: "500 × 66 cm", "45 × 45 cm"
+  summaryDescription: varchar("summary_description", { length: 255 }), // Resumo para tabela de Investimento
+  description: text("description"), // Descrição técnica completa para Escopo do Fornecimento
   quantity: integer("quantity").default(1).notNull(),
   widthMeters: numeric("width_meters", { precision: 8, scale: 3 }),
   heightMeters: numeric("height_meters", { precision: 8, scale: 3 }),

@@ -18,6 +18,8 @@ import { redirect } from "next/navigation";
 
 export interface ItemPayload {
   productName: string;
+  dimensions?: string;
+  summaryDescription?: string;
   description?: string;
   quantity: number;
   widthMeters?: number;
@@ -37,9 +39,23 @@ export interface ItemPayload {
  */
 export async function createQuoteAction(formData: FormData) {
   const clientId = formData.get("clientId") as string;
-  const deliveryTimeDays = parseInt((formData.get("deliveryTimeDays") as string) || "15", 10);
-  const validityDays = parseInt((formData.get("validityDays") as string) || "10", 10);
-  const paymentConditions = (formData.get("paymentConditions") as string) || "50% entrada e 50% na entrega";
+  const title = (formData.get("title") as string) || "COMUNICAÇÃO VISUAL";
+  const contactPerson = (formData.get("contactPerson") as string) || "";
+  const billingAddress = (formData.get("billingAddress") as string) || "";
+  const installationAddress = (formData.get("installationAddress") as string) || "";
+  const includedServices =
+    (formData.get("includedServices") as string) ||
+    "Usinagens técnicas, subestrutura metálica, equipe especializada de instalação e limpeza pós-obra.";
+  const warrantyTerms =
+    (formData.get("warrantyTerms") as string) ||
+    "12 (doze) meses contra defeitos de fabricação mecânica, ancoragem e integridade dos materiais.";
+  const cityStateLocation =
+    (formData.get("cityStateLocation") as string) || "São José do Rio Preto/SP";
+  const deliveryTimeDays = parseInt((formData.get("deliveryTimeDays") as string) || "30", 10);
+  const validityDays = parseInt((formData.get("validityDays") as string) || "30", 10);
+  const paymentConditions =
+    (formData.get("paymentConditions") as string) ||
+    "50% no aceite formal da proposta e 50% após a conclusão e validação da instalação, mediante emissão de Nota Fiscal Eletrônica.";
   const commercialNotes = (formData.get("commercialNotes") as string) || "";
   const internalNotes = (formData.get("internalNotes") as string) || "";
   const itemsJson = formData.get("items") as string;
@@ -89,6 +105,13 @@ export async function createQuoteAction(formData: FormData) {
       status: "rascunho",
       issueDate,
       validUntil,
+      title,
+      contactPerson,
+      billingAddress,
+      installationAddress,
+      includedServices,
+      warrantyTerms,
+      cityStateLocation,
       paymentConditions,
       deliveryTimeDays,
       commercialNotes,
@@ -104,13 +127,15 @@ export async function createQuoteAction(formData: FormData) {
     await db.insert(quoteItems).values({
       quoteId: insertedQuote.id,
       productName: item.productName,
+      dimensions: item.dimensions || null,
+      summaryDescription: item.summaryDescription || item.productName,
       description: item.description || "",
       quantity: Number(item.quantity) || 1,
       widthMeters: item.widthMeters ? String(item.widthMeters) : null,
       heightMeters: item.heightMeters ? String(item.heightMeters) : null,
       unitArea: item.unitArea ? String(item.unitArea) : null,
       totalArea: item.totalArea ? String(item.totalArea) : null,
-      pricingMethod: item.pricingMethod || "composicao",
+      pricingMethod: item.pricingMethod || "manual",
       unitCostCents: Math.round(Number(item.unitCostCents) || 0),
       totalCostCents: Math.round(Number(item.totalCostCents) || 0),
       unitPriceCents: Math.round(Number(item.unitPriceCents) || 0),

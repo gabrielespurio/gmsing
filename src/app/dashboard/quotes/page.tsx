@@ -28,6 +28,9 @@ export default async function QuotesPage() {
         name: clients.name,
         tradeName: clients.tradeName,
         document: clients.document,
+        address: clients.address,
+        city: clients.city,
+        state: clients.state,
       })
       .from(clients)
       .where(eq(clients.active, true))

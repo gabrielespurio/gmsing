@@ -7,17 +7,14 @@ import { quotes, quoteItems, clients, orders } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import {
   ArrowLeft,
-  Calendar,
   CheckCircle,
-  Clock,
-  DollarSign,
-  FileText,
-  MapPin,
   ShoppingBag,
-  CreditCard,
-  Building,
+  ExternalLink,
+  FileText,
 } from "lucide-react";
-import { convertQuoteToOrderAction, updateQuoteStatusAction } from "@/domains/quotes/actions";
+import { convertQuoteToOrderAction } from "@/domains/quotes/actions";
+import { ProposalDocument } from "@/components/quotes/proposal-document";
+import { PrintButton } from "@/components/quotes/print-button";
 
 function formatCurrency(cents: number) {
   return new Intl.NumberFormat("pt-BR", {
@@ -49,6 +46,13 @@ export default async function QuoteDetailPage({
       status: quotes.status,
       issueDate: quotes.issueDate,
       validUntil: quotes.validUntil,
+      title: quotes.title,
+      contactPerson: quotes.contactPerson,
+      billingAddress: quotes.billingAddress,
+      installationAddress: quotes.installationAddress,
+      includedServices: quotes.includedServices,
+      warrantyTerms: quotes.warrantyTerms,
+      cityStateLocation: quotes.cityStateLocation,
       paymentConditions: quotes.paymentConditions,
       deliveryTimeDays: quotes.deliveryTimeDays,
       commercialNotes: quotes.commercialNotes,
@@ -76,7 +80,22 @@ export default async function QuoteDetailPage({
   }
 
   const items = await db
-    .select()
+    .select({
+      id: quoteItems.id,
+      productName: quoteItems.productName,
+      dimensions: quoteItems.dimensions,
+      summaryDescription: quoteItems.summaryDescription,
+      description: quoteItems.description,
+      quantity: quoteItems.quantity,
+      unitPriceCents: quoteItems.unitPriceCents,
+      totalPriceCents: quoteItems.totalPriceCents,
+      widthMeters: quoteItems.widthMeters,
+      heightMeters: quoteItems.heightMeters,
+      unitArea: quoteItems.unitArea,
+      totalArea: quoteItems.totalArea,
+      unitCostCents: quoteItems.unitCostCents,
+      totalCostCents: quoteItems.totalCostCents,
+    })
     .from(quoteItems)
     .where(eq(quoteItems.quoteId, id));
 
@@ -87,13 +106,25 @@ export default async function QuoteDetailPage({
     .where(eq(orders.quoteId, id))
     .limit(1);
 
-  const profitCents = quote.totalCents - quote.estimatedCostCents;
-  const marginPercent = quote.totalCents > 0 ? Math.round((profitCents / quote.totalCents) * 100) : 0;
+  // Endereços formatados como fallback
+  const clientFormattedAddress = [
+    quote.clientAddress,
+    quote.clientCity && quote.clientState ? `${quote.clientCity}/${quote.clientState}` : quote.clientCity,
+  ]
+    .filter(Boolean)
+    .join(" — ");
+
+  const proposalData = {
+    ...quote,
+    billingAddress: quote.billingAddress || clientFormattedAddress,
+    installationAddress: quote.installationAddress || clientFormattedAddress,
+    items,
+  };
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
-      {/* Top Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div className="max-w-5xl mx-auto space-y-6 pb-12">
+      {/* Top Bar de Navegação & Ações */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
         <div className="flex items-center gap-3">
           <Link
             href="/dashboard/quotes"
@@ -103,7 +134,7 @@ export default async function QuoteDetailPage({
           </Link>
           <div>
             <div className="flex items-center gap-2.5">
-              <h1 className="text-2xl font-bold tracking-tight text-[#0B1730]">
+              <h1 className="text-xl font-bold tracking-tight text-[#0B1730]">
                 {quote.code}
               </h1>
               <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full uppercase bg-[#B87A52]/15 text-[#B87A52] border border-[#B87A52]/30">
@@ -119,126 +150,49 @@ export default async function QuoteDetailPage({
           </div>
         </div>
 
-        {existingOrder ? (
+        <div className="flex flex-wrap items-center gap-2.5">
           <Link
-            href="/dashboard/orders"
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold transition-colors shadow-sm"
+            href={`/dashboard/quotes/${quote.id}/print`}
+            target="_blank"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-colors shadow-2xs"
           >
-            <ShoppingBag className="w-4 h-4" />
-            <span>Ver Pedido ({existingOrder.code})</span>
+            <ExternalLink className="w-3.5 h-3.5 text-slate-500" />
+            <span>Abrir Modelo A4</span>
           </Link>
-        ) : quote.status !== "aprovado" ? (
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-amber-700 font-medium px-3 py-1 bg-amber-50 rounded-md border border-amber-200">
-              Pronto para aprovação
-            </span>
-          </div>
-        ) : null}
-      </div>
 
-      {/* Grid: Cliente & Resumo */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="md:col-span-2 bg-white p-6 rounded-xl border border-slate-200 shadow-2xs space-y-4">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-100 pb-2">
-            Dados do Cliente
-          </h2>
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <span className="text-xs text-slate-400 block">Razão Social / Nome:</span>
-              <strong className="text-slate-800 font-semibold">{quote.clientName}</strong>
-              {quote.clientTrade && (
-                <span className="text-xs text-slate-500 block">{quote.clientTrade}</span>
-              )}
-            </div>
-            <div>
-              <span className="text-xs text-slate-400 block">Documento (CPF/CNPJ):</span>
-              <span className="text-slate-700 font-mono text-xs">{quote.clientDoc || "-"}</span>
-            </div>
-            <div>
-              <span className="text-xs text-slate-400 block">Contato:</span>
-              <span className="text-slate-700">{quote.clientPhone || quote.clientEmail || "-"}</span>
-            </div>
-            <div>
-              <span className="text-xs text-slate-400 block">Localização:</span>
-              <span className="text-slate-700">
-                {quote.clientCity ? `${quote.clientCity} - ${quote.clientState}` : "-"}
-              </span>
-            </div>
-          </div>
-        </div>
+          <PrintButton />
 
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-2xs space-y-3 flex flex-col justify-between">
-          <div>
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-100 pb-2">
-              Resumo Financeiro
-            </h2>
-            <div className="mt-3 space-y-2 text-sm">
-              <div className="flex justify-between text-slate-500">
-                <span>Custo Estimado:</span>
-                <span className="font-mono">{formatCurrency(quote.estimatedCostCents)}</span>
-              </div>
-              <div className="flex justify-between text-emerald-600 font-medium">
-                <span>Lucro Previsto:</span>
-                <span className="font-mono">{formatCurrency(profitCents)} ({marginPercent}%)</span>
-              </div>
-            </div>
-          </div>
-          <div className="pt-3 border-t border-slate-100 flex justify-between items-baseline">
-            <span className="text-xs font-semibold uppercase text-slate-600">Total Proposta:</span>
-            <span className="text-2xl font-bold text-[#14274B] font-mono">
-              {formatCurrency(quote.totalCents)}
-            </span>
-          </div>
+          {existingOrder ? (
+            <Link
+              href="/dashboard/orders"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition-colors shadow-sm"
+            >
+              <ShoppingBag className="w-4 h-4" />
+              <span>Ver Pedido ({existingOrder.code})</span>
+            </Link>
+          ) : null}
         </div>
       </div>
 
-      {/* Itens do Orçamento */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-200">
-          <h2 className="font-semibold text-slate-800 text-sm">Itens da Composição Técnica</h2>
+      {/* Faixa Informativa da Proposta Oficial */}
+      <div className="flex items-center justify-between p-3.5 px-5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-600">
+        <div className="flex items-center gap-2">
+          <FileText className="w-4 h-4 text-[#B87A52]" />
+          <span>
+            Visualização da <strong>Proposta Comercial Oficial</strong> idêntica ao modelo da GM Sign Solutions.
+          </span>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm text-slate-700">
-            <thead className="bg-slate-50 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200">
-              <tr>
-                <th className="px-6 py-3.5">Item / Descrição</th>
-                <th className="px-6 py-3.5">Dimensões</th>
-                <th className="px-6 py-3.5 text-center">Qtd</th>
-                <th className="px-6 py-3.5 text-right">Custo Est.</th>
-                <th className="px-6 py-3.5 text-right">Preço Unitário</th>
-                <th className="px-6 py-3.5 text-right">Total</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {items.map((it) => (
-                <tr key={it.id}>
-                  <td className="px-6 py-4">
-                    <div className="font-semibold text-slate-900">{it.productName}</div>
-                    {it.description && <div className="text-xs text-slate-500 mt-0.5">{it.description}</div>}
-                  </td>
-                  <td className="px-6 py-4 font-mono text-xs text-slate-600">
-                    {it.widthMeters && it.heightMeters
-                      ? `${it.widthMeters}m x ${it.heightMeters}m (${it.totalArea}m²)`
-                      : "Sob Medida"}
-                  </td>
-                  <td className="px-6 py-4 text-center font-medium">{it.quantity}</td>
-                  <td className="px-6 py-4 text-right text-slate-500 font-mono text-xs">
-                    {formatCurrency(it.totalCostCents)}
-                  </td>
-                  <td className="px-6 py-4 text-right text-slate-800 font-mono text-xs">
-                    {formatCurrency(it.unitPriceCents)}
-                  </td>
-                  <td className="px-6 py-4 text-right font-bold text-[#14274B] font-mono">
-                    {formatCurrency(it.totalPriceCents)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <span className="font-mono font-bold text-slate-800 text-sm">
+          Total: {formatCurrency(quote.totalCents)}
+        </span>
       </div>
 
-      {/* SEÇÃO PRINCIPAL DE CONVERSÃO EM PEDIDO */}
+      {/* Renderização da Folha Oficial de Proposta Comercial GM Sign Solutions */}
+      <div className="rounded-2xl border border-slate-300/80 shadow-md overflow-hidden bg-slate-100 p-2 sm:p-6">
+        <ProposalDocument data={proposalData} />
+      </div>
+
+      {/* SEÇÃO DE CONVERSÃO EM PEDIDO (Quando ainda não convertido) */}
       {!existingOrder && quote.status !== "aprovado" && (
         <div className="bg-[#0B1730] text-white p-6 rounded-xl border border-[#1e345e] shadow-md space-y-5">
           <div className="flex items-center gap-3 border-b border-[#1e345e] pb-3">
@@ -247,7 +201,7 @@ export default async function QuoteDetailPage({
             </div>
             <div>
               <h2 className="text-base font-bold text-white">
-                Aprovar Orçamento e Converter em Pedido
+                Aprovar Proposta e Converter em Pedido de Venda
               </h2>
               <p className="text-xs text-slate-300">
                 Ao converter, o pedido será criado na produção, as parcelas financeiras serão geradas e os materiais alocados no estoque.
@@ -318,7 +272,7 @@ export default async function QuoteDetailPage({
                 <input
                   type="text"
                   name="installationAddress"
-                  defaultValue={quote.clientAddress || `${quote.clientCity || "São Paulo"} - SP`}
+                  defaultValue={quote.installationAddress || quote.clientAddress || `${quote.clientCity || "São Paulo"} - SP`}
                   placeholder="Ex: Av. Paulista, 1000 - Fachada frontal"
                   className="w-full h-10 px-3 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-[#B87A52]"
                 />
@@ -332,7 +286,7 @@ export default async function QuoteDetailPage({
                   type="date"
                   name="expectedDeliveryDate"
                   defaultValue={
-                    new Date(Date.now() + (quote.deliveryTimeDays || 15) * 86400000)
+                    new Date(Date.now() + (quote.deliveryTimeDays || 30) * 86400000)
                       .toISOString()
                       .split("T")[0]
                   }
