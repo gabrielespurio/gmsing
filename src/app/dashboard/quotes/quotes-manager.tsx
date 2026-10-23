@@ -679,28 +679,6 @@ export function QuotesManager({
                     </span>
                   </div>
 
-                  {/* Seletor Opcional de Catálogo */}
-                  {products.length > 0 && (
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 p-3 bg-white rounded-lg border border-slate-200 shadow-2xs">
-                      <span className="text-xs font-bold text-[#0B1730] flex items-center gap-1.5 shrink-0">
-                        <Boxes className="w-4 h-4 text-[#B87A52]" />
-                        <span>Carregar do Catálogo (Opcional):</span>
-                      </span>
-                      <select
-                        value={selectedCatalogId}
-                        onChange={(e) => handleCatalogSelect(e.target.value)}
-                        className="flex-1 h-9 px-3 bg-slate-50 border border-slate-300 rounded-lg text-xs text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-[#B87A52]/40"
-                      >
-                        <option value="">-- Selecionar Produto ou Serviço Pré-Cadastrado --</option>
-                        {products.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            [{p.type === "servico" ? "SERVIÇO" : "PRODUTO"}] {p.code} - {p.name} ({formatCurrency(p.salePriceCents)})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-
                   {/* Construtor de Item / Serviço */}
                   <div className="p-4 bg-white rounded-xl border border-slate-200 space-y-3.5">
                     <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
