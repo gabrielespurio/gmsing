@@ -14,9 +14,18 @@ import {
   Trash2,
   X,
   Save,
+  Edit2,
+  AlertTriangle,
+  Loader2,
 } from "lucide-react";
 import { Pagination } from "@/components/ui/pagination";
-import { createQuoteAction, ItemPayload } from "@/domains/quotes/actions";
+import {
+  createQuoteAction,
+  getQuoteForEditAction,
+  updateQuoteAction,
+  deleteQuoteAction,
+  ItemPayload,
+} from "@/domains/quotes/actions";
 
 export interface QuoteItem {
   id: string;
@@ -99,6 +108,18 @@ export function QuotesManager({
 }: QuotesManagerProps) {
   const searchParams = useSearchParams();
   const [modalOpen, setModalOpen] = useState(false);
+  const [editingQuoteId, setEditingQuoteId] = useState<string | null>(null);
+  const [editingQuoteCode, setEditingQuoteCode] = useState<string | null>(null);
+  const [status, setStatus] = useState<string>("rascunho");
+  const [isLoadingEdit, setIsLoadingEdit] = useState(false);
+
+  // Estado para exclusão com confirmação
+  const [deleteConfirmQuote, setDeleteConfirmQuote] = useState<{
+    id: string;
+    code: string;
+    clientName: string;
+  } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Filtros e Paginação da Tabela
   const [search, setSearch] = useState("");
@@ -144,13 +165,6 @@ export function QuotesManager({
 
   // Lista de Itens do Orçamento
   const [items, setItems] = useState<ItemPayload[]>([]);
-
-  // Se a rota vier com ?new=true, abre o modal automaticamente
-  useEffect(() => {
-    if (searchParams?.get("new") === "true") {
-      setModalOpen(true);
-    }
-  }, [searchParams]);
 
   // KPIs
   const totalQuotesCount = quotes.length;
@@ -251,6 +265,17 @@ export function QuotesManager({
     setItems(items.filter((_, i) => i !== index));
   };
 
+  const handleEditItem = (index: number) => {
+    const item = items[index];
+    setProductName(item.productName);
+    setDimensions(item.dimensions || "");
+    setSummaryDescription(item.summaryDescription || "");
+    setProductDescription(item.description || "");
+    setQuantity(String(item.quantity || 1));
+    setUnitPrice((item.unitPriceCents / 100).toFixed(2));
+    setItems(items.filter((_, i) => i !== index));
+  };
+
   // Totais do Orçamento
   const totalPrice = items.reduce((acc, it) => acc + it.totalPriceCents, 0);
 
@@ -260,6 +285,9 @@ export function QuotesManager({
       ? [firstClient.address, firstClient.city && firstClient.state ? `${firstClient.city}/${firstClient.state}` : firstClient.city].filter(Boolean).join(" — ")
       : "";
 
+    setEditingQuoteId(null);
+    setEditingQuoteCode(null);
+    setStatus("rascunho");
     setSelectedClient(firstClient?.id || "");
     setTitle("COMUNICAÇÃO VISUAL — PROPOSTA DE FORNECIMENTO");
     setContactPerson("");
@@ -290,12 +318,84 @@ export function QuotesManager({
     setModalOpen(true);
   };
 
+  const handleOpenEdit = async (quoteId: string) => {
+    setIsLoadingEdit(true);
+    try {
+      const data = await getQuoteForEditAction(quoteId);
+      const q = data.quote;
+      setEditingQuoteId(q.id);
+      setEditingQuoteCode(q.code);
+      setSelectedClient(q.clientId);
+      setTitle(q.title || "COMUNICAÇÃO VISUAL — PROPOSTA DE FORNECIMENTO");
+      setStatus(q.status);
+      setContactPerson(q.contactPerson || "");
+      setBillingAddress(q.billingAddress || "");
+      setInstallationAddress(q.installationAddress || "");
+      setCityStateLocation(q.cityStateLocation || "São José do Rio Preto/SP");
+      setValidityDays(String(q.validityDays || 30));
+      setDeliveryTimeDays(String(q.deliveryTimeDays || 30));
+      setPaymentConditions(q.paymentConditions || "");
+      setIncludedServices(q.includedServices || "");
+      setWarrantyTerms(q.warrantyTerms || "");
+      setCommercialNotes(q.commercialNotes || "");
+      setInternalNotes(q.internalNotes || "");
+      setItems(data.items);
+      setSelectedCatalogId("");
+      setProductName("");
+      setDimensions("");
+      setSummaryDescription("");
+      setProductDescription("");
+      setQuantity("1");
+      setUnitPrice("");
+      setModalOpen(true);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Erro ao carregar dados do orçamento para edição.";
+      alert(msg);
+    } finally {
+      setIsLoadingEdit(false);
+    }
+  };
+
   const handleCloseModal = () => {
     setModalOpen(false);
-    if (typeof window !== "undefined" && window.location.search.includes("new=true")) {
+    setEditingQuoteId(null);
+    setEditingQuoteCode(null);
+    if (typeof window !== "undefined" && (window.location.search.includes("new=true") || window.location.search.includes("edit="))) {
       window.history.replaceState(null, "", window.location.pathname);
     }
   };
+
+  const handleRequestDelete = (quote: QuoteItem) => {
+    setDeleteConfirmQuote({
+      id: quote.id,
+      code: quote.code,
+      clientName: quote.clientName,
+    });
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteConfirmQuote) return;
+    setIsDeleting(true);
+    try {
+      await deleteQuoteAction(deleteConfirmQuote.id);
+      setDeleteConfirmQuote(null);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Erro ao excluir orçamento.";
+      alert(msg);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  // Se a rota vier com ?new=true ou ?edit=ID, abre o modal automaticamente
+  useEffect(() => {
+    const editId = searchParams?.get("edit");
+    if (editId) {
+      handleOpenEdit(editId);
+    } else if (searchParams?.get("new") === "true") {
+      handleOpenCreate();
+    }
+  }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -325,7 +425,15 @@ export function QuotesManager({
       formData.set("commercialNotes", commercialNotes);
       formData.set("internalNotes", internalNotes);
       formData.set("items", JSON.stringify(items));
-      await createQuoteAction(formData);
+
+      if (editingQuoteId) {
+        formData.set("quoteId", editingQuoteId);
+        formData.set("status", status);
+        await updateQuoteAction(formData);
+      } else {
+        await createQuoteAction(formData);
+      }
+
       handleCloseModal();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Ocorreu um erro ao salvar o orçamento.";
@@ -511,13 +619,37 @@ export function QuotesManager({
                         </span>
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <Link
-                          href={`/dashboard/quotes/${quote.id}`}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-[#14274B] bg-[#14274B]/5 hover:bg-[#14274B]/10 transition-colors"
-                        >
-                          <span>Abrir</span>
-                          <ArrowUpRight className="w-3.5 h-3.5" />
-                        </Link>
+                        <div className="flex items-center justify-end gap-1.5">
+                          <Link
+                            href={`/dashboard/quotes/${quote.id}`}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium text-[#14274B] bg-[#14274B]/5 hover:bg-[#14274B]/10 transition-colors"
+                            title="Visualizar Proposta / Imprimir"
+                          >
+                            <span>Abrir</span>
+                            <ArrowUpRight className="w-3.5 h-3.5" />
+                          </Link>
+
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEdit(quote.id)}
+                            disabled={isLoadingEdit}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200/60 transition-colors cursor-pointer disabled:opacity-50"
+                            title="Editar Orçamento"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                            <span>Editar</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleRequestDelete(quote)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200/60 transition-colors cursor-pointer"
+                            title="Excluir Orçamento"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>Excluir</span>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -546,10 +678,14 @@ export function QuotesManager({
                 </div>
                 <div>
                   <h3 className="font-bold text-slate-900 text-base">
-                    Nova Proposta Comercial (Padrão GM Sign)
+                    {editingQuoteId
+                      ? `Editar Orçamento ${editingQuoteCode}`
+                      : "Nova Proposta Comercial (Padrão GM Sign)"}
                   </h3>
                   <p className="text-xs text-slate-500">
-                    Estrutura com Escopo do Fornecimento, Tabela de Investimento, Condições e Aceite Formal.
+                    {editingQuoteId
+                      ? "Atualize o escopo técnico, valores, itens ou condições comerciais desta proposta."
+                      : "Estrutura com Escopo do Fornecimento, Tabela de Investimento, Condições e Aceite Formal."}
                   </p>
                 </div>
               </div>
@@ -606,6 +742,26 @@ export function QuotesManager({
                         ))}
                       </select>
                     </div>
+
+                    {editingQuoteId && (
+                      <div className="md:col-span-2">
+                        <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+                          Status do Orçamento *
+                        </label>
+                        <select
+                          value={status}
+                          onChange={(e) => setStatus(e.target.value)}
+                          className="w-full h-10 px-3 bg-white border border-slate-300 rounded-lg text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#B87A52]/40"
+                        >
+                          <option value="rascunho">Rascunho</option>
+                          <option value="enviado">Enviado</option>
+                          <option value="negociacao">Em Negociação</option>
+                          <option value="aprovado">Aprovado / Pedido</option>
+                          <option value="recusado">Recusado</option>
+                          <option value="cancelado">Cancelado</option>
+                        </select>
+                      </div>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -842,14 +998,24 @@ export function QuotesManager({
                                 {formatCurrency(item.totalPriceCents)}
                               </td>
                               <td className="px-3.5 py-3 text-center">
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoveItem(idx)}
-                                  className="p-1.5 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer rounded hover:bg-rose-50"
-                                  title="Remover Item"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
+                                <div className="flex items-center justify-center gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleEditItem(idx)}
+                                    className="p-1.5 text-slate-400 hover:text-amber-600 transition-colors cursor-pointer rounded hover:bg-amber-50"
+                                    title="Editar este item"
+                                  >
+                                    <Edit2 className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveItem(idx)}
+                                    className="p-1.5 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer rounded hover:bg-rose-50"
+                                    title="Remover Item"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           ))
@@ -977,11 +1143,78 @@ export function QuotesManager({
                     className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[#B87A52] hover:bg-[#a66a43] text-white text-sm font-semibold transition-colors shadow-sm cursor-pointer disabled:opacity-50"
                   >
                     <Save className="w-4 h-4" />
-                    <span>{isSubmitting ? "Gerando Orçamento..." : "Salvar Orçamento"}</span>
+                    <span>
+                      {isSubmitting
+                        ? "Salvando..."
+                        : editingQuoteId
+                        ? "Salvar Alterações"
+                        : "Salvar Orçamento"}
+                    </span>
                   </button>
                 </div>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Alerta / Confirmação de Exclusão */}
+      {deleteConfirmQuote && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-hidden">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-6 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-start gap-4">
+              <div className="w-11 h-11 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-base font-bold text-slate-900">
+                  Excluir Orçamento
+                </h3>
+                <p className="text-sm text-slate-600 mt-1.5 leading-relaxed">
+                  Deseja mesmo excluir o orçamento{" "}
+                  <strong className="font-semibold text-slate-900 font-mono">
+                    {deleteConfirmQuote.code}
+                  </strong>{" "}
+                  do cliente{" "}
+                  <strong className="font-semibold text-slate-900">
+                    {deleteConfirmQuote.clientName}
+                  </strong>
+                  ?
+                </p>
+                <div className="mt-3 p-3 bg-rose-50 border border-rose-100 rounded-lg text-xs text-rose-700 leading-relaxed">
+                  Atenção: Esta ação é definitiva e removerá todos os itens técnicos e cálculos vinculados a esta proposta.
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 flex items-center justify-end gap-3 border-t border-slate-100 pt-4">
+              <button
+                type="button"
+                onClick={() => setDeleteConfirmQuote(null)}
+                disabled={isDeleting}
+                className="px-4 py-2 rounded-lg border border-slate-300 text-slate-700 text-sm font-medium hover:bg-slate-50 transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                disabled={isDeleting}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-sm font-semibold transition-colors shadow-sm cursor-pointer disabled:opacity-50"
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Excluindo...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4" />
+                    <span>Sim, Excluir</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -150,6 +150,234 @@ export async function createQuoteAction(formData: FormData) {
 }
 
 /**
+ * Obtém todos os dados do orçamento e seus itens para edição
+ */
+export async function getQuoteForEditAction(quoteId: string) {
+  if (!quoteId) {
+    throw new Error("ID do orçamento não fornecido.");
+  }
+
+  const [quote] = await db
+    .select()
+    .from(quotes)
+    .where(eq(quotes.id, quoteId))
+    .limit(1);
+
+  if (!quote) {
+    throw new Error("Orçamento não encontrado.");
+  }
+
+  const items = await db
+    .select()
+    .from(quoteItems)
+    .where(eq(quoteItems.quoteId, quoteId));
+
+  let validityDays = 30;
+  if (quote.validUntil && quote.issueDate) {
+    const diffTime =
+      new Date(quote.validUntil).getTime() - new Date(quote.issueDate).getTime();
+    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+    if (diffDays > 0) validityDays = diffDays;
+  }
+
+  const mappedItems: ItemPayload[] = items.map((it) => ({
+    productName: it.productName,
+    dimensions: it.dimensions || undefined,
+    summaryDescription: it.summaryDescription || it.productName,
+    description: it.description || "",
+    quantity: it.quantity,
+    widthMeters: it.widthMeters ? Number(it.widthMeters) : undefined,
+    heightMeters: it.heightMeters ? Number(it.heightMeters) : undefined,
+    unitArea: it.unitArea ? Number(it.unitArea) : undefined,
+    totalArea: it.totalArea ? Number(it.totalArea) : undefined,
+    pricingMethod: it.pricingMethod || "manual",
+    unitCostCents: it.unitCostCents || 0,
+    totalCostCents: it.totalCostCents || 0,
+    unitPriceCents: it.unitPriceCents,
+    totalPriceCents: it.totalPriceCents,
+    notes: it.notes || "",
+  }));
+
+  return {
+    quote: {
+      ...quote,
+      validityDays,
+    },
+    items: mappedItems,
+  };
+}
+
+/**
+ * Edição completa do orçamento e atualização de seus itens
+ */
+export async function updateQuoteAction(formData: FormData) {
+  const quoteId = formData.get("quoteId") as string;
+  if (!quoteId) {
+    throw new Error("ID do orçamento é obrigatório");
+  }
+
+  const [existingQuote] = await db
+    .select()
+    .from(quotes)
+    .where(eq(quotes.id, quoteId))
+    .limit(1);
+
+  if (!existingQuote) {
+    throw new Error("Orçamento não encontrado");
+  }
+
+  const clientId = formData.get("clientId") as string;
+  const status = (formData.get("status") as string) || existingQuote.status;
+  const title = (formData.get("title") as string) || "COMUNICAÇÃO VISUAL";
+  const contactPerson = (formData.get("contactPerson") as string) || "";
+  const billingAddress = (formData.get("billingAddress") as string) || "";
+  const installationAddress = (formData.get("installationAddress") as string) || "";
+  const includedServices = (formData.get("includedServices") as string) || "";
+  const warrantyTerms = (formData.get("warrantyTerms") as string) || "";
+  const cityStateLocation =
+    (formData.get("cityStateLocation") as string) || "São José do Rio Preto/SP";
+  const deliveryTimeDays = parseInt((formData.get("deliveryTimeDays") as string) || "30", 10);
+  const validityDays = parseInt((formData.get("validityDays") as string) || "30", 10);
+  const paymentConditions = (formData.get("paymentConditions") as string) || "";
+  const commercialNotes = (formData.get("commercialNotes") as string) || "";
+  const internalNotes = (formData.get("internalNotes") as string) || "";
+  const itemsJson = formData.get("items") as string;
+
+  if (!clientId) {
+    throw new Error("Cliente é obrigatório");
+  }
+
+  let items: ItemPayload[] = [];
+  try {
+    items = JSON.parse(itemsJson || "[]");
+  } catch {
+    throw new Error("Itens do orçamento inválidos");
+  }
+
+  if (items.length === 0) {
+    throw new Error("Adicione pelo menos um item ao orçamento");
+  }
+
+  // Recalcula validUntil a partir da data de emissão
+  const validUntil = new Date(existingQuote.issueDate);
+  validUntil.setDate(validUntil.getDate() + validityDays);
+
+  let subtotalCents = 0;
+  let estimatedCostCents = 0;
+
+  for (const item of items) {
+    subtotalCents += Math.round(Number(item.totalPriceCents || 0));
+    estimatedCostCents += Math.round(Number(item.totalCostCents || 0));
+  }
+
+  const discountCents = existingQuote.discountCents || 0;
+  const totalCents = subtotalCents - discountCents;
+
+  const revision =
+    existingQuote.status === "rascunho"
+      ? existingQuote.revision
+      : existingQuote.revision + 1;
+
+  await db
+    .update(quotes)
+    .set({
+      clientId,
+      status,
+      revision,
+      validUntil,
+      title,
+      contactPerson,
+      billingAddress,
+      installationAddress,
+      includedServices,
+      warrantyTerms,
+      cityStateLocation,
+      paymentConditions,
+      deliveryTimeDays,
+      commercialNotes,
+      internalNotes,
+      subtotalCents,
+      totalCents,
+      estimatedCostCents,
+      updatedAt: new Date(),
+    })
+    .where(eq(quotes.id, quoteId));
+
+  // Substitui itens vinculados
+  await db.delete(quoteItems).where(eq(quoteItems.quoteId, quoteId));
+
+  for (const item of items) {
+    await db.insert(quoteItems).values({
+      quoteId,
+      productName: item.productName,
+      dimensions: item.dimensions || null,
+      summaryDescription: item.summaryDescription || item.productName,
+      description: item.description || "",
+      quantity: Number(item.quantity) || 1,
+      widthMeters: item.widthMeters ? String(item.widthMeters) : null,
+      heightMeters: item.heightMeters ? String(item.heightMeters) : null,
+      unitArea: item.unitArea ? String(item.unitArea) : null,
+      totalArea: item.totalArea ? String(item.totalArea) : null,
+      pricingMethod: item.pricingMethod || "manual",
+      unitCostCents: Math.round(Number(item.unitCostCents) || 0),
+      totalCostCents: Math.round(Number(item.totalCostCents) || 0),
+      unitPriceCents: Math.round(Number(item.unitPriceCents) || 0),
+      totalPriceCents: Math.round(Number(item.totalPriceCents) || 0),
+      notes: item.notes || null,
+    });
+  }
+
+  revalidatePath("/dashboard/quotes");
+  revalidatePath(`/dashboard/quotes/${quoteId}`);
+  revalidatePath("/dashboard");
+
+  return { success: true, quoteId };
+}
+
+/**
+ * Exclui um orçamento e seus itens vinculados
+ */
+export async function deleteQuoteAction(quoteId: string) {
+  if (!quoteId) {
+    throw new Error("ID do orçamento não fornecido.");
+  }
+
+  const [quote] = await db
+    .select({ id: quotes.id, code: quotes.code })
+    .from(quotes)
+    .where(eq(quotes.id, quoteId))
+    .limit(1);
+
+  if (!quote) {
+    throw new Error("Orçamento não encontrado.");
+  }
+
+  // Verifica se há pedido gerado a partir deste orçamento
+  const linkedOrders = await db
+    .select({ code: orders.code })
+    .from(orders)
+    .where(eq(orders.quoteId, quoteId))
+    .limit(1);
+
+  if (linkedOrders.length > 0) {
+    throw new Error(
+      `Não é possível excluir o orçamento ${quote.code} pois ele já foi convertido no pedido ${linkedOrders[0].code}. Cancele ou remova o pedido primeiro.`
+    );
+  }
+
+  // Remove itens primeiro
+  await db.delete(quoteItems).where(eq(quoteItems.quoteId, quoteId));
+
+  // Remove o orçamento
+  await db.delete(quotes).where(eq(quotes.id, quoteId));
+
+  revalidatePath("/dashboard/quotes");
+  revalidatePath("/dashboard");
+
+  return { success: true };
+}
+
+/**
  * Atualiza status do orçamento (ex: enviar, negociar, recusar)
  */
 export async function updateQuoteStatusAction(quoteId: string, status: string) {

@@ -11,10 +11,12 @@ import {
   ShoppingBag,
   ExternalLink,
   FileText,
+  Edit2,
 } from "lucide-react";
 import { convertQuoteToOrderAction } from "@/domains/quotes/actions";
 import { ProposalDocument } from "@/components/quotes/proposal-document";
 import { PrintButton } from "@/components/quotes/print-button";
+import { DeleteQuoteButton } from "@/components/quotes/delete-quote-button";
 
 function formatCurrency(cents: number) {
   return new Intl.NumberFormat("pt-BR", {
@@ -152,6 +154,15 @@ export default async function QuoteDetailPage({
 
         <div className="flex flex-wrap items-center gap-2.5">
           <Link
+            href={`/dashboard/quotes?edit=${quote.id}`}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-amber-50 border border-amber-200/80 hover:bg-amber-100 text-amber-800 text-xs font-semibold transition-colors shadow-2xs"
+            title="Editar Orçamento"
+          >
+            <Edit2 className="w-3.5 h-3.5" />
+            <span>Editar Orçamento</span>
+          </Link>
+
+          <Link
             href={`/dashboard/quotes/${quote.id}/print`}
             target="_blank"
             className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-colors shadow-2xs"
@@ -161,6 +172,14 @@ export default async function QuoteDetailPage({
           </Link>
 
           <PrintButton />
+
+          {!existingOrder && (
+            <DeleteQuoteButton
+              quoteId={quote.id}
+              quoteCode={quote.code}
+              clientName={quote.clientName}
+            />
+          )}
 
           {existingOrder ? (
             <Link
