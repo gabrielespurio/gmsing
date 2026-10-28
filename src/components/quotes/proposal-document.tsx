@@ -33,6 +33,7 @@ export interface ProposalData {
   paymentConditions?: string | null;
   commercialNotes?: string | null;
   deliveryTimeDays?: number | null;
+  validityDays?: number | null;
   subtotalCents?: number | null;
   discountCents?: number | null;
   totalCents: number;
@@ -53,6 +54,58 @@ function formatCurrency(cents: number) {
   }).format(cents / 100);
 }
 
+function formatDateShort(date: Date) {
+  const d = new Date(date);
+  return new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(d);
+}
+
+function extensoDias(dias: number): string {
+  const mapa: Record<number, string> = {
+    1: "um",
+    2: "dois",
+    3: "três",
+    4: "quatro",
+    5: "cinco",
+    6: "seis",
+    7: "sete",
+    8: "oito",
+    9: "nove",
+    10: "dez",
+    11: "onze",
+    12: "doze",
+    13: "treze",
+    14: "quatorze",
+    15: "quinze",
+    16: "dezesseis",
+    17: "dezessete",
+    18: "dezoito",
+    19: "dezenove",
+    20: "vinte",
+    21: "vinte e um",
+    22: "vinte e dois",
+    23: "vinte e três",
+    24: "vinte e quatro",
+    25: "vinte e cinco",
+    26: "vinte e seis",
+    27: "vinte e sete",
+    28: "vinte e oito",
+    29: "vinte e nove",
+    30: "trinta",
+    35: "trinta e cinco",
+    40: "quarenta",
+    45: "quarenta e cinco",
+    50: "cinquenta",
+    60: "sessenta",
+    90: "noventa",
+    120: "cento e vinte",
+  };
+  return mapa[dias] || String(dias);
+}
+
 function formatDateExtenso(date: Date) {
   const d = new Date(date);
   return new Intl.DateTimeFormat("pt-BR", {
@@ -65,6 +118,18 @@ function formatDateExtenso(date: Date) {
 export function ProposalDocument({ data }: { data: ProposalData }) {
   const currentYear = new Date(data.issueDate).getFullYear();
   const halfValue = Math.round(data.totalCents / 2);
+  const deliveryDays = data.deliveryTimeDays || 30;
+  const validityDays =
+    data.validityDays ??
+    (data.validUntil && data.issueDate
+      ? Math.max(
+          1,
+          Math.round(
+            (new Date(data.validUntil).getTime() - new Date(data.issueDate).getTime()) /
+              (1000 * 60 * 60 * 24)
+          )
+        )
+      : 30);
 
   // Formata o código no padrão da proposta se aplicável (ex: ORC-2026-047 -> 47/2026)
   let proposalNumber = data.code;
@@ -191,9 +256,10 @@ export function ProposalDocument({ data }: { data: ProposalData }) {
                 <span className="mx-2 text-slate-400 font-bold">|</span>
                 <span className="font-bold text-slate-900">Validade:</span>{" "}
                 <span>
-                  {data.validUntil
-                    ? `${Math.max(1, Math.round((new Date(data.validUntil).getTime() - new Date(data.issueDate).getTime()) / (1000 * 60 * 60 * 24)))} dias`
-                    : "30 dias"}
+                  {validityDays} {validityDays === 1 ? "dia" : "dias"}
+                  {data.validUntil && (
+                    <span className="text-slate-600 font-normal"> (até {formatDateShort(data.validUntil)})</span>
+                  )}
                 </span>
               </td>
             </tr>
@@ -327,7 +393,7 @@ export function ProposalDocument({ data }: { data: ProposalData }) {
           </p>
           <p>
             <strong className="text-slate-900">Prazo de fabricação e instalação:</strong> até{" "}
-            {data.deliveryTimeDays || 30} (trinta) dias úteis após a confirmação formal do pedido e aprovação do layout.
+            {deliveryDays} ({extensoDias(deliveryDays)}) dias úteis após a confirmação formal do pedido e aprovação do layout.
           </p>
           <p>
             <strong className="text-slate-900">Garantia técnica:</strong>{" "}
@@ -336,9 +402,8 @@ export function ProposalDocument({ data }: { data: ProposalData }) {
           </p>
           <p>
             <strong className="text-slate-900">Validade do orçamento:</strong>{" "}
-            {data.validUntil
-              ? `${Math.max(1, Math.round((new Date(data.validUntil).getTime() - new Date(data.issueDate).getTime()) / (1000 * 60 * 60 * 24)))} (trinta) dias a contar da data de emissão.`
-              : "30 (trinta) dias a contar da data de emissão."}
+            {validityDays} ({extensoDias(validityDays)}) {validityDays === 1 ? "dia" : "dias"} a contar da data de emissão
+            {data.validUntil ? ` (válido até ${formatDateShort(data.validUntil)})` : ""}.
           </p>
 
           {data.commercialNotes && data.commercialNotes.trim() && (

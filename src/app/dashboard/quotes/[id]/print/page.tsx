@@ -34,6 +34,7 @@ export default async function QuotePrintPage({
       paymentConditions: quotes.paymentConditions,
       commercialNotes: quotes.commercialNotes,
       deliveryTimeDays: quotes.deliveryTimeDays,
+      validityDays: quotes.validityDays,
       subtotalCents: quotes.subtotalCents,
       discountCents: quotes.discountCents,
       totalCents: quotes.totalCents,

@@ -57,6 +57,7 @@ export default async function QuoteDetailPage({
       cityStateLocation: quotes.cityStateLocation,
       paymentConditions: quotes.paymentConditions,
       deliveryTimeDays: quotes.deliveryTimeDays,
+      validityDays: quotes.validityDays,
       commercialNotes: quotes.commercialNotes,
       internalNotes: quotes.internalNotes,
       subtotalCents: quotes.subtotalCents,

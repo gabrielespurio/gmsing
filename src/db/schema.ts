@@ -152,6 +152,7 @@ export const quotes = pgTable("quotes", {
   cityStateLocation: varchar("city_state_location", { length: 100 }).default("São José do Rio Preto/SP"),
   paymentConditions: text("payment_conditions"),
   deliveryTimeDays: integer("delivery_time_days").default(15),
+  validityDays: integer("validity_days").default(30),
   commercialNotes: text("commercial_notes"),
   internalNotes: text("internal_notes"),
   subtotalCents: integer("subtotal_cents").default(0).notNull(),

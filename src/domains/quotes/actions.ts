@@ -114,6 +114,7 @@ export async function createQuoteAction(formData: FormData) {
       cityStateLocation,
       paymentConditions,
       deliveryTimeDays,
+      validityDays,
       commercialNotes,
       internalNotes,
       subtotalCents,
@@ -172,13 +173,17 @@ export async function getQuoteForEditAction(quoteId: string) {
     .from(quoteItems)
     .where(eq(quoteItems.quoteId, quoteId));
 
-  let validityDays = 30;
-  if (quote.validUntil && quote.issueDate) {
-    const diffTime =
-      new Date(quote.validUntil).getTime() - new Date(quote.issueDate).getTime();
-    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
-    if (diffDays > 0) validityDays = diffDays;
-  }
+  const validityDays =
+    quote.validityDays ??
+    (quote.validUntil && quote.issueDate
+      ? Math.max(
+          1,
+          Math.round(
+            (new Date(quote.validUntil).getTime() - new Date(quote.issueDate).getTime()) /
+              (1000 * 60 * 60 * 24)
+          )
+        )
+      : 30);
 
   const mappedItems: ItemPayload[] = items.map((it) => ({
     productName: it.productName,
@@ -294,6 +299,7 @@ export async function updateQuoteAction(formData: FormData) {
       cityStateLocation,
       paymentConditions,
       deliveryTimeDays,
+      validityDays,
       commercialNotes,
       internalNotes,
       subtotalCents,
