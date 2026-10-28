@@ -97,6 +97,7 @@ export default async function QuoteDetailPage({
       totalArea: quoteItems.totalArea,
       unitCostCents: quoteItems.unitCostCents,
       totalCostCents: quoteItems.totalCostCents,
+      notes: quoteItems.notes,
     })
     .from(quoteItems)
     .where(eq(quoteItems.quoteId, id));
@@ -120,13 +121,14 @@ export default async function QuoteDetailPage({
     ...quote,
     billingAddress: quote.billingAddress || clientFormattedAddress,
     installationAddress: quote.installationAddress || clientFormattedAddress,
+    commercialNotes: quote.commercialNotes,
     items,
   };
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6 pb-12">
+    <div className="max-w-5xl mx-auto space-y-6 pb-12 print:max-w-none print:p-0 print:m-0 print:space-y-0">
       {/* Top Bar de Navegação & Ações */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-2xs print:hidden">
         <div className="flex items-center gap-3">
           <Link
             href="/dashboard/quotes"
@@ -194,7 +196,7 @@ export default async function QuoteDetailPage({
       </div>
 
       {/* Faixa Informativa da Proposta Oficial */}
-      <div className="flex items-center justify-between p-3.5 px-5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-600">
+      <div className="flex items-center justify-between p-3.5 px-5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-600 print:hidden">
         <div className="flex items-center gap-2">
           <FileText className="w-4 h-4 text-[#B87A52]" />
           <span>
@@ -207,13 +209,13 @@ export default async function QuoteDetailPage({
       </div>
 
       {/* Renderização da Folha Oficial de Proposta Comercial GM Sign Solutions */}
-      <div className="rounded-2xl border border-slate-300/80 shadow-md overflow-hidden bg-slate-100 p-2 sm:p-6">
+      <div className="rounded-2xl border border-slate-300/80 shadow-md overflow-hidden bg-slate-100 p-2 sm:p-6 print:border-none print:shadow-none print:bg-white print:p-0 print:overflow-visible">
         <ProposalDocument data={proposalData} />
       </div>
 
       {/* SEÇÃO DE CONVERSÃO EM PEDIDO (Quando ainda não convertido) */}
       {!existingOrder && quote.status !== "aprovado" && (
-        <div className="bg-[#0B1730] text-white p-6 rounded-xl border border-[#1e345e] shadow-md space-y-5">
+        <div className="bg-[#0B1730] text-white p-6 rounded-xl border border-[#1e345e] shadow-md space-y-5 print:hidden">
           <div className="flex items-center gap-3 border-b border-[#1e345e] pb-3">
             <div className="w-9 h-9 rounded-lg bg-[#B87A52]/20 border border-[#B87A52]/40 flex items-center justify-center text-[#E3B48A]">
               <CheckCircle className="w-5 h-5" />

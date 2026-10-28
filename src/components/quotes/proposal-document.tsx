@@ -1,7 +1,7 @@
 import React from "react";
 
 export interface ProposalItem {
-  id: string;
+  id?: string;
   productName: string;
   dimensions?: string | null;
   summaryDescription?: string | null;
@@ -9,6 +9,11 @@ export interface ProposalItem {
   quantity: number;
   unitPriceCents: number;
   totalPriceCents: number;
+  widthMeters?: string | number | null;
+  heightMeters?: string | number | null;
+  unitArea?: string | number | null;
+  totalArea?: string | number | null;
+  notes?: string | null;
 }
 
 export interface ProposalData {
@@ -26,7 +31,10 @@ export interface ProposalData {
   includedServices?: string | null;
   warrantyTerms?: string | null;
   paymentConditions?: string | null;
+  commercialNotes?: string | null;
   deliveryTimeDays?: number | null;
+  subtotalCents?: number | null;
+  discountCents?: number | null;
   totalCents: number;
   clientName: string;
   clientTrade?: string | null;
@@ -66,16 +74,27 @@ export function ProposalDocument({ data }: { data: ProposalData }) {
     proposalNumber = `${parseInt(seq, 10)}/${yr}`;
   }
 
-  // Prepara texto de pagamento com os valores em R$ já calculados
-  let paymentText = data.paymentConditions;
-  if (!paymentText || paymentText.toLowerCase().includes("50%")) {
+  // Prepara texto de pagamento respeitando condição personalizada informada
+  let paymentText = data.paymentConditions?.trim();
+  const defaultStandardPrefix =
+    "50% no aceite formal da proposta e 50% após a conclusão e validação da instalação, mediante emissão de Nota Fiscal Eletrônica.";
+
+  if (!paymentText) {
+    paymentText = `50% no aceite formal da proposta (${formatCurrency(halfValue)}) e 50% após a conclusão e validação da instalação (${formatCurrency(halfValue)}), mediante emissão de Nota Fiscal Eletrônica.`;
+  } else if (
+    paymentText === defaultStandardPrefix ||
+    paymentText.startsWith("50% no aceite formal da proposta e 50% após")
+  ) {
     paymentText = `50% no aceite formal da proposta (${formatCurrency(halfValue)}) e 50% após a conclusão e validação da instalação (${formatCurrency(halfValue)}), mediante emissão de Nota Fiscal Eletrônica.`;
   }
+
+  const subtotal = data.subtotalCents ?? data.totalCents;
+  const discount = data.discountCents ?? 0;
 
   return (
     <div className="proposal-container bg-white text-slate-900 font-sans max-w-[850px] mx-auto p-6 sm:p-10 shadow-lg border border-slate-200 print:shadow-none print:border-none print:p-0 print:max-w-none print:w-full leading-normal">
       {/* 1. CABEÇALHO */}
-      <div className="flex items-center justify-between pb-3 border-b-2 border-[#B87A52]">
+      <div className="flex items-center justify-between pb-3 border-b-2 border-[#B87A52] print-avoid-break">
         {/* Logo / Marca GM SIGN */}
         <div className="border border-slate-700 p-2 sm:p-2.5 px-3 sm:px-4 text-center inline-block">
           <div className="text-xl sm:text-2xl font-black tracking-tight text-[#0B1730] uppercase leading-none">
@@ -95,9 +114,14 @@ export function ProposalDocument({ data }: { data: ProposalData }) {
       </div>
 
       {/* 2. TÍTULO DA PROPOSTA */}
-      <div className="mt-5 sm:mt-6 text-center space-y-1">
+      <div className="mt-5 sm:mt-6 text-center space-y-1 print-avoid-break">
         <h1 className="text-lg sm:text-2xl font-black tracking-wide text-[#0B1730] uppercase">
           PROPOSTA COMERCIAL Nº {proposalNumber}
+          {data.revision > 1 && (
+            <span className="text-sm sm:text-base font-bold text-[#B87A52] ml-2">
+              (REV. {data.revision})
+            </span>
+          )}
         </h1>
         <h2 className="text-xs sm:text-sm font-bold tracking-wider text-[#B87A52] uppercase">
           {data.title || `COMUNICAÇÃO VISUAL — ${data.clientName}`}
@@ -105,7 +129,7 @@ export function ProposalDocument({ data }: { data: ProposalData }) {
       </div>
 
       {/* 3. QUADRO DE IDENTIFICAÇÃO */}
-      <div className="mt-5 border border-slate-300 text-[11px] sm:text-xs">
+      <div className="mt-5 border border-slate-300 text-[11px] sm:text-xs print-avoid-break">
         <table className="w-full border-collapse">
           <tbody>
             <tr className="border-b border-slate-200">
@@ -126,12 +150,22 @@ export function ProposalDocument({ data }: { data: ProposalData }) {
             </tr>
             <tr className="border-b border-slate-200">
               <td className="w-24 sm:w-28 font-bold text-slate-900 py-1.5 px-3 bg-slate-50/60 border-r border-slate-200">
-                CNPJ:
+                CNPJ / CPF:
               </td>
               <td className="py-1.5 px-3 text-slate-800 font-mono">
                 {data.clientDoc || "-"}
               </td>
             </tr>
+            {(data.clientPhone || data.clientEmail) && (
+              <tr className="border-b border-slate-200">
+                <td className="w-24 sm:w-28 font-bold text-slate-900 py-1.5 px-3 bg-slate-50/60 border-r border-slate-200">
+                  Contato:
+                </td>
+                <td className="py-1.5 px-3 text-slate-800">
+                  {[data.clientPhone, data.clientEmail].filter(Boolean).join(" • ")}
+                </td>
+              </tr>
+            )}
             <tr className="border-b border-slate-200">
               <td className="w-24 sm:w-28 font-bold text-slate-900 py-1.5 px-3 bg-slate-50/60 border-r border-slate-200">
                 Faturamento:
@@ -167,14 +201,14 @@ export function ProposalDocument({ data }: { data: ProposalData }) {
         </table>
       </div>
 
-      {/* 4. ESCOPO DO FORNECIMENTO */}
+      {/* 4. ESCOPO DO FORNECIMENTO (Detalhamento Técnico) */}
       <div className="mt-5">
-        <div className="bg-[#0B1730] text-white font-bold text-[11px] sm:text-xs uppercase tracking-wider px-3 py-1.5 flex items-center justify-between">
+        <div className="bg-[#0B1730] text-white font-bold text-[11px] sm:text-xs uppercase tracking-wider px-3 py-1.5 flex items-center justify-between print-avoid-break">
           <span>ESCOPO DO FORNECIMENTO</span>
         </div>
         <div className="border border-slate-300 border-t-0 text-[11px] sm:text-xs divide-y divide-slate-200">
           {data.items.map((item, idx) => (
-            <div key={item.id || idx} className="flex">
+            <div key={item.id || idx} className="flex print-avoid-break">
               <div className="w-10 sm:w-12 shrink-0 py-2.5 text-center font-bold text-slate-900 border-r border-slate-200 bg-slate-50/40">
                 {String(idx + 1).padStart(2, "0")}
               </div>
@@ -183,9 +217,18 @@ export function ProposalDocument({ data }: { data: ProposalData }) {
                   {item.productName}
                   {item.dimensions ? ` — ${item.dimensions}` : ""}
                 </div>
-                {item.description && (
+                {item.description ? (
                   <div className="text-slate-700 text-[11px] sm:text-xs leading-relaxed whitespace-pre-line">
                     {item.description}
+                  </div>
+                ) : item.summaryDescription ? (
+                  <div className="text-slate-700 text-[11px] sm:text-xs leading-relaxed">
+                    {item.summaryDescription}
+                  </div>
+                ) : null}
+                {item.notes && (
+                  <div className="text-[10px] text-[#B87A52] font-medium pt-0.5">
+                    Observação: {item.notes}
                   </div>
                 )}
               </div>
@@ -194,47 +237,81 @@ export function ProposalDocument({ data }: { data: ProposalData }) {
         </div>
       </div>
 
-      {/* 5. INVESTIMENTO */}
-      <div className="mt-5">
+      {/* 5. INVESTIMENTO (Tabela Comercial dos Itens) */}
+      <div className="mt-5 print-avoid-break">
         <div className="bg-[#0B1730] text-white font-bold text-[11px] sm:text-xs uppercase tracking-wider px-3 py-1.5">
           <span>INVESTIMENTO</span>
         </div>
         <div className="border border-slate-300 border-t-0 text-[11px] sm:text-xs">
-          <div className="divide-y divide-slate-200">
-            {data.items.map((item, idx) => {
-              const summary = item.summaryDescription || item.productName;
-              return (
-                <div key={item.id || idx} className="flex items-center">
-                  <div className="w-10 sm:w-12 shrink-0 py-2 text-center font-bold text-slate-900 border-r border-slate-200 bg-slate-50/40">
-                    {String(idx + 1).padStart(2, "0")}
-                  </div>
-                  <div className="p-2 sm:px-3 flex-1 flex items-center justify-between">
-                    <span className="text-slate-800">
-                      {summary} — {String(item.quantity).padStart(2, "0")} un.
-                    </span>
-                    <span className="font-bold text-slate-900 font-mono text-right">
+          <table className="w-full text-left border-collapse">
+            <thead className="bg-slate-100 text-slate-700 font-semibold border-b border-slate-200">
+              <tr>
+                <th className="py-2 px-3 text-center w-12 border-r border-slate-200">Item</th>
+                <th className="py-2 px-3">Escopo / Especificação</th>
+                <th className="py-2 px-3 text-center w-16">Qtd</th>
+                <th className="py-2 px-3 text-right w-28">Valor Unit.</th>
+                <th className="py-2 px-3 text-right w-32">Valor Total</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200">
+              {data.items.map((item, idx) => {
+                const summary = item.summaryDescription || item.productName;
+                return (
+                  <tr key={item.id || idx} className="hover:bg-slate-50/40">
+                    <td className="py-2 px-3 text-center font-bold text-slate-900 border-r border-slate-200 bg-slate-50/40">
+                      {String(idx + 1).padStart(2, "0")}
+                    </td>
+                    <td className="py-2 px-3 text-slate-800">
+                      <span className="font-semibold text-slate-900">{summary}</span>
+                      {item.dimensions && (
+                        <span className="text-slate-500 text-[10px] ml-1.5 font-mono">
+                          ({item.dimensions})
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-2 px-3 text-center font-mono text-slate-700">
+                      {String(item.quantity).padStart(2, "0")} un
+                    </td>
+                    <td className="py-2 px-3 text-right font-mono text-slate-700">
+                      {formatCurrency(item.unitPriceCents)}
+                    </td>
+                    <td className="py-2 px-3 text-right font-bold text-slate-900 font-mono">
                       {formatCurrency(item.totalPriceCents)}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
 
-          {/* Linha Total */}
-          <div className="border-t-2 border-slate-400 bg-slate-50/60 p-2.5 px-3 flex items-center justify-between">
-            <span className="font-black text-slate-900 uppercase tracking-wider text-xs sm:text-sm">
-              TOTAL
-            </span>
-            <span className="font-black text-[#0B1730] font-mono text-sm sm:text-base">
-              {formatCurrency(data.totalCents)}
-            </span>
+          {/* Totais do Orçamento */}
+          <div className="border-t-2 border-slate-400 bg-slate-50/60 p-2.5 px-3 space-y-1">
+            {discount > 0 && (
+              <>
+                <div className="flex items-center justify-between text-xs text-slate-600">
+                  <span>Subtotal:</span>
+                  <span className="font-mono">{formatCurrency(subtotal)}</span>
+                </div>
+                <div className="flex items-center justify-between text-xs text-emerald-700">
+                  <span>Desconto Comercial:</span>
+                  <span className="font-mono">- {formatCurrency(discount)}</span>
+                </div>
+              </>
+            )}
+            <div className="flex items-center justify-between pt-1">
+              <span className="font-black text-slate-900 uppercase tracking-wider text-xs sm:text-sm">
+                VALOR TOTAL DO INVESTIMENTO
+              </span>
+              <span className="font-black text-[#0B1730] font-mono text-sm sm:text-base">
+                {formatCurrency(data.totalCents)}
+              </span>
+            </div>
           </div>
         </div>
       </div>
 
       {/* 6. CONDIÇÕES COMERCIAIS */}
-      <div className="mt-5">
+      <div className="mt-5 print-avoid-break">
         <div className="bg-[#0B1730] text-white font-bold text-[11px] sm:text-xs uppercase tracking-wider px-3 py-1.5">
           <span>CONDIÇÕES COMERCIAIS</span>
         </div>
@@ -263,11 +340,20 @@ export function ProposalDocument({ data }: { data: ProposalData }) {
               ? `${Math.max(1, Math.round((new Date(data.validUntil).getTime() - new Date(data.issueDate).getTime()) / (1000 * 60 * 60 * 24)))} (trinta) dias a contar da data de emissão.`
               : "30 (trinta) dias a contar da data de emissão."}
           </p>
+
+          {data.commercialNotes && data.commercialNotes.trim() && (
+            <div className="mt-2.5 p-2.5 bg-slate-50 border border-slate-200 rounded text-slate-800">
+              <strong className="text-slate-900 block mb-1">Observações Comerciais & Técnicas:</strong>
+              <div className="whitespace-pre-line text-[11px] sm:text-xs text-slate-700 leading-relaxed">
+                {data.commercialNotes}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
       {/* 7. APROVAÇÃO E ACEITE FORMAL */}
-      <div className="mt-5">
+      <div className="mt-5 print-avoid-break">
         <div className="bg-[#0B1730] text-white font-bold text-[11px] sm:text-xs uppercase tracking-wider px-3 py-1.5">
           <span>APROVAÇÃO E ACEITE FORMAL</span>
         </div>

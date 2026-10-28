@@ -25,20 +25,40 @@ body {
 @media print {
   @page {
     size: A4 portrait;
-    margin: 10mm 12mm 10mm 12mm;
+    margin: 8mm 10mm 8mm 10mm;
   }
 
+  html,
   body {
     background: #ffffff !important;
     color: #000000 !important;
+    height: auto !important;
+    min-height: 100% !important;
+    overflow: visible !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
 
-  header, nav, aside, .no-print {
+  /* Desativa altura de tela e overflow restrito de containers pai para impressão */
+  div,
+  main,
+  section,
+  article {
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+  }
+
+  /* Oculta navegação e botões */
+  header,
+  nav,
+  aside,
+  .no-print,
+  [data-no-print="true"] {
     display: none !important;
   }
 
+  /* Container da folha A4 */
   .proposal-container {
     max-width: 100% !important;
     width: 100% !important;
@@ -46,6 +66,30 @@ body {
     margin: 0 !important;
     box-shadow: none !important;
     border: none !important;
+    background: #ffffff !important;
+  }
+
+  /* Previne que blocos importantes sejam cortados no meio da página */
+  .print-avoid-break {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  table {
+    page-break-inside: auto;
+  }
+
+  tr {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  tfoot {
+    display: table-footer-group;
   }
 }
 

@@ -32,7 +32,10 @@ export default async function QuotePrintPage({
       warrantyTerms: quotes.warrantyTerms,
       cityStateLocation: quotes.cityStateLocation,
       paymentConditions: quotes.paymentConditions,
+      commercialNotes: quotes.commercialNotes,
       deliveryTimeDays: quotes.deliveryTimeDays,
+      subtotalCents: quotes.subtotalCents,
+      discountCents: quotes.discountCents,
       totalCents: quotes.totalCents,
       clientName: clients.name,
       clientTrade: clients.tradeName,
@@ -62,6 +65,11 @@ export default async function QuotePrintPage({
       quantity: quoteItems.quantity,
       unitPriceCents: quoteItems.unitPriceCents,
       totalPriceCents: quoteItems.totalPriceCents,
+      widthMeters: quoteItems.widthMeters,
+      heightMeters: quoteItems.heightMeters,
+      unitArea: quoteItems.unitArea,
+      totalArea: quoteItems.totalArea,
+      notes: quoteItems.notes,
     })
     .from(quoteItems)
     .where(eq(quoteItems.quoteId, id));
@@ -78,6 +86,7 @@ export default async function QuotePrintPage({
     ...quote,
     billingAddress: quote.billingAddress || clientFormattedAddress,
     installationAddress: quote.installationAddress || clientFormattedAddress,
+    commercialNotes: quote.commercialNotes,
     items,
   };
 
