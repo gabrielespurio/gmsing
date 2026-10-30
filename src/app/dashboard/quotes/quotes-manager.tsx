@@ -17,6 +17,7 @@ import {
   Edit2,
   AlertTriangle,
   Loader2,
+  Check,
 } from "lucide-react";
 import { Pagination } from "@/components/ui/pagination";
 import {
@@ -26,6 +27,24 @@ import {
   deleteQuoteAction,
   ItemPayload,
 } from "@/domains/quotes/actions";
+
+interface QuoteDraft {
+  selectedClient: string;
+  title: string;
+  contactPerson: string;
+  billingAddress: string;
+  installationAddress: string;
+  cityStateLocation: string;
+  validityDays: string;
+  deliveryTimeDays: string;
+  paymentConditions: string;
+  includedServices: string;
+  warrantyTerms: string;
+  commercialNotes: string;
+  internalNotes: string;
+  items: ItemPayload[];
+  savedAt: string;
+}
 
 export interface QuoteItem {
   id: string;
@@ -166,6 +185,10 @@ export function QuotesManager({
   // Lista de Itens do Orçamento
   const [items, setItems] = useState<ItemPayload[]>([]);
 
+  // Rascunho automático em localStorage
+  const [availableDraft, setAvailableDraft] = useState<QuoteDraft | null>(null);
+  const [draftSaved, setDraftSaved] = useState(false);
+
   // KPIs
   const totalQuotesCount = quotes.length;
   const approvedQuotes = quotes.filter((q) => q.status === "aprovado");
@@ -279,6 +302,98 @@ export function QuotesManager({
   // Totais do Orçamento
   const totalPrice = items.reduce((acc, it) => acc + it.totalPriceCents, 0);
 
+  // Carrega rascunho salvo do localStorage ao montar o componente
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem("gm_sign_quote_draft");
+        if (stored) {
+          const parsed = JSON.parse(stored) as QuoteDraft;
+          if (parsed && Array.isArray(parsed.items) && parsed.items.length > 0) {
+            setAvailableDraft(parsed);
+          }
+        }
+      } catch (e) {
+        console.warn("Erro ao ler rascunho de orçamento:", e);
+      }
+    }
+  }, []);
+
+  // Salva automaticamente o rascunho em localStorage enquanto monta um novo orçamento
+  useEffect(() => {
+    if (!modalOpen || editingQuoteId) return;
+
+    if (items.length > 0 || commercialNotes.trim() || contactPerson.trim() || internalNotes.trim()) {
+      const draft: QuoteDraft = {
+        selectedClient,
+        title,
+        contactPerson,
+        billingAddress,
+        installationAddress,
+        cityStateLocation,
+        validityDays,
+        deliveryTimeDays,
+        paymentConditions,
+        includedServices,
+        warrantyTerms,
+        commercialNotes,
+        internalNotes,
+        items,
+        savedAt: new Date().toISOString(),
+      };
+      try {
+        localStorage.setItem("gm_sign_quote_draft", JSON.stringify(draft));
+        setDraftSaved(true);
+      } catch (e) {
+        console.warn("Não foi possível salvar rascunho:", e);
+      }
+    }
+  }, [
+    modalOpen,
+    editingQuoteId,
+    selectedClient,
+    title,
+    contactPerson,
+    billingAddress,
+    installationAddress,
+    cityStateLocation,
+    validityDays,
+    deliveryTimeDays,
+    paymentConditions,
+    includedServices,
+    warrantyTerms,
+    commercialNotes,
+    internalNotes,
+    items,
+  ]);
+
+  const handleRestoreDraft = () => {
+    if (!availableDraft) return;
+    if (availableDraft.selectedClient) setSelectedClient(availableDraft.selectedClient);
+    if (availableDraft.title) setTitle(availableDraft.title);
+    if (availableDraft.contactPerson) setContactPerson(availableDraft.contactPerson);
+    if (availableDraft.billingAddress) setBillingAddress(availableDraft.billingAddress);
+    if (availableDraft.installationAddress) setInstallationAddress(availableDraft.installationAddress);
+    if (availableDraft.cityStateLocation) setCityStateLocation(availableDraft.cityStateLocation);
+    if (availableDraft.validityDays) setValidityDays(availableDraft.validityDays);
+    if (availableDraft.deliveryTimeDays) setDeliveryTimeDays(availableDraft.deliveryTimeDays);
+    if (availableDraft.paymentConditions) setPaymentConditions(availableDraft.paymentConditions);
+    if (availableDraft.includedServices) setIncludedServices(availableDraft.includedServices);
+    if (availableDraft.warrantyTerms) setWarrantyTerms(availableDraft.warrantyTerms);
+    if (availableDraft.commercialNotes) setCommercialNotes(availableDraft.commercialNotes);
+    if (availableDraft.internalNotes) setInternalNotes(availableDraft.internalNotes);
+    if (availableDraft.items && availableDraft.items.length > 0) setItems(availableDraft.items);
+    setAvailableDraft(null);
+  };
+
+  const handleDiscardDraft = () => {
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("gm_sign_quote_draft");
+    }
+    setAvailableDraft(null);
+    setDraftSaved(false);
+  };
+
   const handleOpenCreate = () => {
     const firstClient = clients[0];
     const firstAddr = firstClient
@@ -315,6 +430,22 @@ export function QuotesManager({
     setQuantity("1");
     setUnitPrice("");
     setItems([]);
+
+    // Verifica se há rascunho pendente
+    if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem("gm_sign_quote_draft");
+        if (stored) {
+          const parsed = JSON.parse(stored) as QuoteDraft;
+          if (parsed && Array.isArray(parsed.items) && parsed.items.length > 0) {
+            setAvailableDraft(parsed);
+          }
+        }
+      } catch (e) {
+        console.warn(e);
+      }
+    }
+
     setModalOpen(true);
   };
 
@@ -377,7 +508,11 @@ export function QuotesManager({
     if (!deleteConfirmQuote) return;
     setIsDeleting(true);
     try {
-      await deleteQuoteAction(deleteConfirmQuote.id);
+      const res = await deleteQuoteAction(deleteConfirmQuote.id);
+      if (res && !res.success) {
+        alert(res.error || "Erro ao excluir orçamento.");
+        return;
+      }
       setDeleteConfirmQuote(null);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Erro ao excluir orçamento.";
@@ -426,18 +561,31 @@ export function QuotesManager({
       formData.set("internalNotes", internalNotes);
       formData.set("items", JSON.stringify(items));
 
+      let res;
       if (editingQuoteId) {
         formData.set("quoteId", editingQuoteId);
         formData.set("status", status);
-        await updateQuoteAction(formData);
+        res = await updateQuoteAction(formData);
       } else {
-        await createQuoteAction(formData);
+        res = await createQuoteAction(formData);
       }
+
+      if (res && !res.success) {
+        alert(`Erro ao salvar orçamento: ${res.error || "Tente novamente."}\n\nSeus dados continuam preenchidos no formulário.`);
+        return;
+      }
+
+      // Sucesso! Limpa o rascunho salvo no localStorage
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("gm_sign_quote_draft");
+      }
+      setAvailableDraft(null);
+      setDraftSaved(false);
 
       handleCloseModal();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Ocorreu um erro ao salvar o orçamento.";
-      alert(msg);
+      alert(`Erro ao salvar orçamento: ${msg}\n\nSeus itens e dados continuam preenchidos no formulário.`);
     } finally {
       setIsSubmitting(false);
     }
@@ -701,6 +849,47 @@ export function QuotesManager({
             {/* Formulário com Scroll Interno */}
             <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0 overflow-hidden">
               <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
+                {/* Banner de Rascunho Recuperado / Disponível */}
+                {availableDraft && !editingQuoteId && (
+                  <div className="bg-amber-50 border border-amber-300 rounded-xl p-4 text-xs sm:text-sm text-amber-900 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                    <div className="flex items-start sm:items-center gap-2.5">
+                      <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5 sm:mt-0" />
+                      <div>
+                        <strong className="font-bold block text-slate-900">
+                          Encontramos um orçamento em andamento que não foi finalizado!
+                        </strong>
+                        <span className="text-slate-600 text-xs">
+                          {availableDraft.items?.length || 0}{" "}
+                          {availableDraft.items?.length === 1 ? "item" : "itens"} salvos
+                          automaticamente neste navegador em{" "}
+                          {new Date(availableDraft.savedAt).toLocaleDateString("pt-BR")} às{" "}
+                          {new Date(availableDraft.savedAt).toLocaleTimeString("pt-BR", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                          .
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={handleRestoreDraft}
+                        className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs rounded-lg transition-colors shadow-2xs cursor-pointer"
+                      >
+                        Restaurar Orçamento
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleDiscardDraft}
+                        className="px-2.5 py-1.5 text-xs text-amber-800 hover:text-amber-950 font-medium transition-colors cursor-pointer"
+                      >
+                        Descartar
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {/* 1. Identificação da Proposta & Cliente */}
                 <div className="bg-slate-50/70 p-5 rounded-xl border border-slate-200 space-y-4">
                   <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2 border-b border-slate-200 pb-2">
@@ -1126,8 +1315,18 @@ export function QuotesManager({
 
               {/* Botões do Modal Fixos no Rodapé */}
               <div className="shrink-0 px-6 py-3.5 border-t border-slate-200 bg-slate-50 flex items-center justify-between gap-3">
-                <div className="hidden sm:block text-xs text-slate-500">
-                  Total da Proposta: <span className="font-bold font-mono text-slate-900 text-sm">{formatCurrency(totalPrice)}</span>
+                <div className="flex items-center gap-3">
+                  <div className="hidden sm:flex items-center gap-2 text-xs text-slate-500">
+                    Total da Proposta:{" "}
+                    <span className="font-bold font-mono text-slate-900 text-sm">
+                      {formatCurrency(totalPrice)}
+                    </span>
+                    {!editingQuoteId && draftSaved && (
+                      <span className="inline-flex items-center gap-1 text-[11px] text-emerald-700 font-medium ml-2 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                        <Check className="w-3 h-3 text-emerald-600" /> Rascunho salvo no navegador
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div className="flex items-center gap-3">
                   <button

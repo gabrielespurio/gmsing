@@ -35,119 +35,200 @@ export interface ItemPayload {
 }
 
 /**
+ * Gera o próximo código único para orçamento no formato ORC-YYYY-XXX
+ * Analisa o maior número existente no ano atual para evitar colisões decorrentes de exclusões.
+ */
+export async function getNextQuoteCode(): Promise<string> {
+  const currentYear = new Date().getFullYear();
+  const prefix = `ORC-${currentYear}-`;
+
+  const existingQuotes = await db
+    .select({ code: quotes.code })
+    .from(quotes)
+    .where(sql`${quotes.code} LIKE ${prefix + "%"}`);
+
+  let maxSeq = 0;
+  const existingSet = new Set<string>();
+
+  for (const q of existingQuotes) {
+    if (q.code) {
+      existingSet.add(q.code);
+      if (q.code.startsWith(prefix)) {
+        const numPart = parseInt(q.code.slice(prefix.length), 10);
+        if (!isNaN(numPart) && numPart > maxSeq) {
+          maxSeq = numPart;
+        }
+      }
+    }
+  }
+
+  let nextSeq = maxSeq + 1;
+  let candidate = `${prefix}${String(nextSeq).padStart(3, "0")}`;
+  while (existingSet.has(candidate)) {
+    nextSeq++;
+    candidate = `${prefix}${String(nextSeq).padStart(3, "0")}`;
+  }
+
+  return candidate;
+}
+
+/**
+ * Gera o próximo código único para pedido no formato PED-YYYY-XXX
+ * Analisa o maior número existente no ano atual para evitar colisões.
+ */
+export async function getNextOrderCode(): Promise<string> {
+  const currentYear = new Date().getFullYear();
+  const prefix = `PED-${currentYear}-`;
+
+  const existingOrders = await db
+    .select({ code: orders.code })
+    .from(orders)
+    .where(sql`${orders.code} LIKE ${prefix + "%"}`);
+
+  let maxSeq = 0;
+  const existingSet = new Set<string>();
+
+  for (const o of existingOrders) {
+    if (o.code) {
+      existingSet.add(o.code);
+      if (o.code.startsWith(prefix)) {
+        const numPart = parseInt(o.code.slice(prefix.length), 10);
+        if (!isNaN(numPart) && numPart > maxSeq) {
+          maxSeq = numPart;
+        }
+      }
+    }
+  }
+
+  let nextSeq = maxSeq + 1;
+  let candidate = `${prefix}${String(nextSeq).padStart(3, "0")}`;
+  while (existingSet.has(candidate)) {
+    nextSeq++;
+    candidate = `${prefix}${String(nextSeq).padStart(3, "0")}`;
+  }
+
+  return candidate;
+}
+
+/**
  * Criação de novo orçamento com cálculo e snapshot de itens
  */
-export async function createQuoteAction(formData: FormData) {
-  const clientId = formData.get("clientId") as string;
-  const title = (formData.get("title") as string) || "COMUNICAÇÃO VISUAL";
-  const contactPerson = (formData.get("contactPerson") as string) || "";
-  const billingAddress = (formData.get("billingAddress") as string) || "";
-  const installationAddress = (formData.get("installationAddress") as string) || "";
-  const includedServices =
-    (formData.get("includedServices") as string) ||
-    "Usinagens técnicas, subestrutura metálica, equipe especializada de instalação e limpeza pós-obra.";
-  const warrantyTerms =
-    (formData.get("warrantyTerms") as string) ||
-    "12 (doze) meses contra defeitos de fabricação mecânica, ancoragem e integridade dos materiais.";
-  const cityStateLocation =
-    (formData.get("cityStateLocation") as string) || "São José do Rio Preto/SP";
-  const deliveryTimeDays = parseInt((formData.get("deliveryTimeDays") as string) || "30", 10);
-  const validityDays = parseInt((formData.get("validityDays") as string) || "30", 10);
-  const paymentConditions =
-    (formData.get("paymentConditions") as string) ||
-    "50% no aceite formal da proposta e 50% após a conclusão e validação da instalação, mediante emissão de Nota Fiscal Eletrônica.";
-  const commercialNotes = (formData.get("commercialNotes") as string) || "";
-  const internalNotes = (formData.get("internalNotes") as string) || "";
-  const itemsJson = formData.get("items") as string;
-
-  if (!clientId) {
-    throw new Error("Cliente é obrigatório");
-  }
-
-  let items: ItemPayload[] = [];
+export async function createQuoteAction(
+  formData: FormData
+): Promise<{ success: boolean; quoteId?: string; error?: string }> {
   try {
-    items = JSON.parse(itemsJson || "[]");
-  } catch {
-    throw new Error("Itens do orçamento inválidos");
+    const clientId = formData.get("clientId") as string;
+    const title = (formData.get("title") as string) || "COMUNICAÇÃO VISUAL";
+    const contactPerson = (formData.get("contactPerson") as string) || "";
+    const billingAddress = (formData.get("billingAddress") as string) || "";
+    const installationAddress = (formData.get("installationAddress") as string) || "";
+    const includedServices =
+      (formData.get("includedServices") as string) ||
+      "Usinagens técnicas, subestrutura metálica, equipe especializada de instalação e limpeza pós-obra.";
+    const warrantyTerms =
+      (formData.get("warrantyTerms") as string) ||
+      "12 (doze) meses contra defeitos de fabricação mecânica, ancoragem e integridade dos materiais.";
+    const cityStateLocation =
+      (formData.get("cityStateLocation") as string) || "São José do Rio Preto/SP";
+    const deliveryTimeDays = parseInt((formData.get("deliveryTimeDays") as string) || "30", 10);
+    const validityDays = parseInt((formData.get("validityDays") as string) || "30", 10);
+    const paymentConditions =
+      (formData.get("paymentConditions") as string) ||
+      "50% no aceite formal da proposta e 50% após a conclusão e validação da instalação, mediante emissão de Nota Fiscal Eletrônica.";
+    const commercialNotes = (formData.get("commercialNotes") as string) || "";
+    const internalNotes = (formData.get("internalNotes") as string) || "";
+    const itemsJson = formData.get("items") as string;
+
+    if (!clientId) {
+      return { success: false, error: "Cliente é obrigatório." };
+    }
+
+    let items: ItemPayload[] = [];
+    try {
+      items = JSON.parse(itemsJson || "[]");
+    } catch {
+      return { success: false, error: "Itens do orçamento inválidos." };
+    }
+
+    if (items.length === 0) {
+      return { success: false, error: "Adicione pelo menos um item ao orçamento." };
+    }
+
+    // Gera código único ORC-YYYY-XXX sem colisão
+    const quoteCode = await getNextQuoteCode();
+
+    const issueDate = new Date();
+    const validUntil = new Date();
+    validUntil.setDate(issueDate.getDate() + validityDays);
+
+    let subtotalCents = 0;
+    let estimatedCostCents = 0;
+
+    for (const item of items) {
+      subtotalCents += Math.round(Number(item.totalPriceCents || 0));
+      estimatedCostCents += Math.round(Number(item.totalCostCents || 0));
+    }
+
+    const discountCents = 0;
+    const totalCents = subtotalCents - discountCents;
+
+    const [insertedQuote] = await db
+      .insert(quotes)
+      .values({
+        code: quoteCode,
+        revision: 1,
+        clientId,
+        status: "rascunho",
+        issueDate,
+        validUntil,
+        title,
+        contactPerson,
+        billingAddress,
+        installationAddress,
+        includedServices,
+        warrantyTerms,
+        cityStateLocation,
+        paymentConditions,
+        deliveryTimeDays,
+        validityDays,
+        commercialNotes,
+        internalNotes,
+        subtotalCents,
+        discountCents,
+        totalCents,
+        estimatedCostCents,
+      })
+      .returning();
+
+    for (const item of items) {
+      await db.insert(quoteItems).values({
+        quoteId: insertedQuote.id,
+        productName: item.productName,
+        dimensions: item.dimensions || null,
+        summaryDescription: item.summaryDescription || item.productName,
+        description: item.description || "",
+        quantity: Number(item.quantity) || 1,
+        widthMeters: item.widthMeters ? String(item.widthMeters) : null,
+        heightMeters: item.heightMeters ? String(item.heightMeters) : null,
+        unitArea: item.unitArea ? String(item.unitArea) : null,
+        totalArea: item.totalArea ? String(item.totalArea) : null,
+        pricingMethod: item.pricingMethod || "manual",
+        unitCostCents: Math.round(Number(item.unitCostCents) || 0),
+        totalCostCents: Math.round(Number(item.totalCostCents) || 0),
+        unitPriceCents: Math.round(Number(item.unitPriceCents) || 0),
+        totalPriceCents: Math.round(Number(item.totalPriceCents) || 0),
+        notes: item.notes || null,
+      });
+    }
+
+    revalidatePath("/dashboard/quotes");
+    revalidatePath("/dashboard");
+    return { success: true, quoteId: insertedQuote.id };
+  } catch (error: unknown) {
+    console.error("Erro em createQuoteAction:", error);
+    const msg = error instanceof Error ? error.message : "Erro interno ao salvar orçamento.";
+    return { success: false, error: msg };
   }
-
-  if (items.length === 0) {
-    throw new Error("Adicione pelo menos um item ao orçamento");
-  }
-
-  // Gera código único ORC-YYYY-XXX
-  const currentYear = new Date().getFullYear();
-  const allQuotes = await db.select({ code: quotes.code }).from(quotes);
-  const nextSeq = allQuotes.length + 1;
-  const quoteCode = `ORC-${currentYear}-${String(nextSeq).padStart(3, "0")}`;
-
-  const issueDate = new Date();
-  const validUntil = new Date();
-  validUntil.setDate(issueDate.getDate() + validityDays);
-
-  let subtotalCents = 0;
-  let estimatedCostCents = 0;
-
-  for (const item of items) {
-    subtotalCents += Math.round(Number(item.totalPriceCents || 0));
-    estimatedCostCents += Math.round(Number(item.totalCostCents || 0));
-  }
-
-  const discountCents = 0;
-  const totalCents = subtotalCents - discountCents;
-
-  const [insertedQuote] = await db
-    .insert(quotes)
-    .values({
-      code: quoteCode,
-      revision: 1,
-      clientId,
-      status: "rascunho",
-      issueDate,
-      validUntil,
-      title,
-      contactPerson,
-      billingAddress,
-      installationAddress,
-      includedServices,
-      warrantyTerms,
-      cityStateLocation,
-      paymentConditions,
-      deliveryTimeDays,
-      validityDays,
-      commercialNotes,
-      internalNotes,
-      subtotalCents,
-      discountCents,
-      totalCents,
-      estimatedCostCents,
-    })
-    .returning();
-
-  for (const item of items) {
-    await db.insert(quoteItems).values({
-      quoteId: insertedQuote.id,
-      productName: item.productName,
-      dimensions: item.dimensions || null,
-      summaryDescription: item.summaryDescription || item.productName,
-      description: item.description || "",
-      quantity: Number(item.quantity) || 1,
-      widthMeters: item.widthMeters ? String(item.widthMeters) : null,
-      heightMeters: item.heightMeters ? String(item.heightMeters) : null,
-      unitArea: item.unitArea ? String(item.unitArea) : null,
-      totalArea: item.totalArea ? String(item.totalArea) : null,
-      pricingMethod: item.pricingMethod || "manual",
-      unitCostCents: Math.round(Number(item.unitCostCents) || 0),
-      totalCostCents: Math.round(Number(item.totalCostCents) || 0),
-      unitPriceCents: Math.round(Number(item.unitPriceCents) || 0),
-      totalPriceCents: Math.round(Number(item.totalPriceCents) || 0),
-      notes: item.notes || null,
-    });
-  }
-
-  revalidatePath("/dashboard/quotes");
-  revalidatePath("/dashboard");
-  return { success: true, quoteId: insertedQuote.id };
 }
 
 /**
@@ -215,172 +296,189 @@ export async function getQuoteForEditAction(quoteId: string) {
 /**
  * Edição completa do orçamento e atualização de seus itens
  */
-export async function updateQuoteAction(formData: FormData) {
-  const quoteId = formData.get("quoteId") as string;
-  if (!quoteId) {
-    throw new Error("ID do orçamento é obrigatório");
-  }
-
-  const [existingQuote] = await db
-    .select()
-    .from(quotes)
-    .where(eq(quotes.id, quoteId))
-    .limit(1);
-
-  if (!existingQuote) {
-    throw new Error("Orçamento não encontrado");
-  }
-
-  const clientId = formData.get("clientId") as string;
-  const status = (formData.get("status") as string) || existingQuote.status;
-  const title = (formData.get("title") as string) || "COMUNICAÇÃO VISUAL";
-  const contactPerson = (formData.get("contactPerson") as string) || "";
-  const billingAddress = (formData.get("billingAddress") as string) || "";
-  const installationAddress = (formData.get("installationAddress") as string) || "";
-  const includedServices = (formData.get("includedServices") as string) || "";
-  const warrantyTerms = (formData.get("warrantyTerms") as string) || "";
-  const cityStateLocation =
-    (formData.get("cityStateLocation") as string) || "São José do Rio Preto/SP";
-  const deliveryTimeDays = parseInt((formData.get("deliveryTimeDays") as string) || "30", 10);
-  const validityDays = parseInt((formData.get("validityDays") as string) || "30", 10);
-  const paymentConditions = (formData.get("paymentConditions") as string) || "";
-  const commercialNotes = (formData.get("commercialNotes") as string) || "";
-  const internalNotes = (formData.get("internalNotes") as string) || "";
-  const itemsJson = formData.get("items") as string;
-
-  if (!clientId) {
-    throw new Error("Cliente é obrigatório");
-  }
-
-  let items: ItemPayload[] = [];
+export async function updateQuoteAction(
+  formData: FormData
+): Promise<{ success: boolean; quoteId?: string; error?: string }> {
   try {
-    items = JSON.parse(itemsJson || "[]");
-  } catch {
-    throw new Error("Itens do orçamento inválidos");
+    const quoteId = formData.get("quoteId") as string;
+    if (!quoteId) {
+      return { success: false, error: "ID do orçamento é obrigatório." };
+    }
+
+    const [existingQuote] = await db
+      .select()
+      .from(quotes)
+      .where(eq(quotes.id, quoteId))
+      .limit(1);
+
+    if (!existingQuote) {
+      return { success: false, error: "Orçamento não encontrado." };
+    }
+
+    const clientId = formData.get("clientId") as string;
+    const status = (formData.get("status") as string) || existingQuote.status;
+    const title = (formData.get("title") as string) || "COMUNICAÇÃO VISUAL";
+    const contactPerson = (formData.get("contactPerson") as string) || "";
+    const billingAddress = (formData.get("billingAddress") as string) || "";
+    const installationAddress = (formData.get("installationAddress") as string) || "";
+    const includedServices = (formData.get("includedServices") as string) || "";
+    const warrantyTerms = (formData.get("warrantyTerms") as string) || "";
+    const cityStateLocation =
+      (formData.get("cityStateLocation") as string) || "São José do Rio Preto/SP";
+    const deliveryTimeDays = parseInt((formData.get("deliveryTimeDays") as string) || "30", 10);
+    const validityDays = parseInt((formData.get("validityDays") as string) || "30", 10);
+    const paymentConditions = (formData.get("paymentConditions") as string) || "";
+    const commercialNotes = (formData.get("commercialNotes") as string) || "";
+    const internalNotes = (formData.get("internalNotes") as string) || "";
+    const itemsJson = formData.get("items") as string;
+
+    if (!clientId) {
+      return { success: false, error: "Cliente é obrigatório." };
+    }
+
+    let items: ItemPayload[] = [];
+    try {
+      items = JSON.parse(itemsJson || "[]");
+    } catch {
+      return { success: false, error: "Itens do orçamento inválidos." };
+    }
+
+    if (items.length === 0) {
+      return { success: false, error: "Adicione pelo menos um item ao orçamento." };
+    }
+
+    // Recalcula validUntil a partir da data de emissão
+    const validUntil = new Date(existingQuote.issueDate);
+    validUntil.setDate(validUntil.getDate() + validityDays);
+
+    let subtotalCents = 0;
+    let estimatedCostCents = 0;
+
+    for (const item of items) {
+      subtotalCents += Math.round(Number(item.totalPriceCents || 0));
+      estimatedCostCents += Math.round(Number(item.totalCostCents || 0));
+    }
+
+    const discountCents = existingQuote.discountCents || 0;
+    const totalCents = subtotalCents - discountCents;
+
+    const revision =
+      existingQuote.status === "rascunho"
+        ? existingQuote.revision
+        : existingQuote.revision + 1;
+
+    await db
+      .update(quotes)
+      .set({
+        clientId,
+        status,
+        revision,
+        validUntil,
+        title,
+        contactPerson,
+        billingAddress,
+        installationAddress,
+        includedServices,
+        warrantyTerms,
+        cityStateLocation,
+        paymentConditions,
+        deliveryTimeDays,
+        validityDays,
+        commercialNotes,
+        internalNotes,
+        subtotalCents,
+        totalCents,
+        estimatedCostCents,
+        updatedAt: new Date(),
+      })
+      .where(eq(quotes.id, quoteId));
+
+    // Substitui itens vinculados
+    await db.delete(quoteItems).where(eq(quoteItems.quoteId, quoteId));
+
+    for (const item of items) {
+      await db.insert(quoteItems).values({
+        quoteId,
+        productName: item.productName,
+        dimensions: item.dimensions || null,
+        summaryDescription: item.summaryDescription || item.productName,
+        description: item.description || "",
+        quantity: Number(item.quantity) || 1,
+        widthMeters: item.widthMeters ? String(item.widthMeters) : null,
+        heightMeters: item.heightMeters ? String(item.heightMeters) : null,
+        unitArea: item.unitArea ? String(item.unitArea) : null,
+        totalArea: item.totalArea ? String(item.totalArea) : null,
+        pricingMethod: item.pricingMethod || "manual",
+        unitCostCents: Math.round(Number(item.unitCostCents) || 0),
+        totalCostCents: Math.round(Number(item.totalCostCents) || 0),
+        unitPriceCents: Math.round(Number(item.unitPriceCents) || 0),
+        totalPriceCents: Math.round(Number(item.totalPriceCents) || 0),
+        notes: item.notes || null,
+      });
+    }
+
+    revalidatePath("/dashboard/quotes");
+    revalidatePath(`/dashboard/quotes/${quoteId}`);
+    revalidatePath("/dashboard");
+
+    return { success: true, quoteId };
+  } catch (error: unknown) {
+    console.error("Erro em updateQuoteAction:", error);
+    const msg = error instanceof Error ? error.message : "Erro interno ao atualizar orçamento.";
+    return { success: false, error: msg };
   }
-
-  if (items.length === 0) {
-    throw new Error("Adicione pelo menos um item ao orçamento");
-  }
-
-  // Recalcula validUntil a partir da data de emissão
-  const validUntil = new Date(existingQuote.issueDate);
-  validUntil.setDate(validUntil.getDate() + validityDays);
-
-  let subtotalCents = 0;
-  let estimatedCostCents = 0;
-
-  for (const item of items) {
-    subtotalCents += Math.round(Number(item.totalPriceCents || 0));
-    estimatedCostCents += Math.round(Number(item.totalCostCents || 0));
-  }
-
-  const discountCents = existingQuote.discountCents || 0;
-  const totalCents = subtotalCents - discountCents;
-
-  const revision =
-    existingQuote.status === "rascunho"
-      ? existingQuote.revision
-      : existingQuote.revision + 1;
-
-  await db
-    .update(quotes)
-    .set({
-      clientId,
-      status,
-      revision,
-      validUntil,
-      title,
-      contactPerson,
-      billingAddress,
-      installationAddress,
-      includedServices,
-      warrantyTerms,
-      cityStateLocation,
-      paymentConditions,
-      deliveryTimeDays,
-      validityDays,
-      commercialNotes,
-      internalNotes,
-      subtotalCents,
-      totalCents,
-      estimatedCostCents,
-      updatedAt: new Date(),
-    })
-    .where(eq(quotes.id, quoteId));
-
-  // Substitui itens vinculados
-  await db.delete(quoteItems).where(eq(quoteItems.quoteId, quoteId));
-
-  for (const item of items) {
-    await db.insert(quoteItems).values({
-      quoteId,
-      productName: item.productName,
-      dimensions: item.dimensions || null,
-      summaryDescription: item.summaryDescription || item.productName,
-      description: item.description || "",
-      quantity: Number(item.quantity) || 1,
-      widthMeters: item.widthMeters ? String(item.widthMeters) : null,
-      heightMeters: item.heightMeters ? String(item.heightMeters) : null,
-      unitArea: item.unitArea ? String(item.unitArea) : null,
-      totalArea: item.totalArea ? String(item.totalArea) : null,
-      pricingMethod: item.pricingMethod || "manual",
-      unitCostCents: Math.round(Number(item.unitCostCents) || 0),
-      totalCostCents: Math.round(Number(item.totalCostCents) || 0),
-      unitPriceCents: Math.round(Number(item.unitPriceCents) || 0),
-      totalPriceCents: Math.round(Number(item.totalPriceCents) || 0),
-      notes: item.notes || null,
-    });
-  }
-
-  revalidatePath("/dashboard/quotes");
-  revalidatePath(`/dashboard/quotes/${quoteId}`);
-  revalidatePath("/dashboard");
-
-  return { success: true, quoteId };
 }
 
 /**
  * Exclui um orçamento e seus itens vinculados
  */
-export async function deleteQuoteAction(quoteId: string) {
-  if (!quoteId) {
-    throw new Error("ID do orçamento não fornecido.");
+export async function deleteQuoteAction(
+  quoteId: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    if (!quoteId) {
+      return { success: false, error: "ID do orçamento não fornecido." };
+    }
+
+    const [quote] = await db
+      .select({ id: quotes.id, code: quotes.code })
+      .from(quotes)
+      .where(eq(quotes.id, quoteId))
+      .limit(1);
+
+    if (!quote) {
+      return { success: false, error: "Orçamento não encontrado." };
+    }
+
+    // Verifica se há pedido gerado a partir deste orçamento
+    const linkedOrders = await db
+      .select({ code: orders.code })
+      .from(orders)
+      .where(eq(orders.quoteId, quoteId))
+      .limit(1);
+
+    if (linkedOrders.length > 0) {
+      return {
+        success: false,
+        error: `Não é possível excluir o orçamento ${quote.code} pois ele já foi convertido no pedido ${linkedOrders[0].code}. Cancele ou remova o pedido primeiro.`,
+      };
+    }
+
+    // Remove itens primeiro
+    await db.delete(quoteItems).where(eq(quoteItems.quoteId, quoteId));
+
+    // Remove o orçamento
+    await db.delete(quotes).where(eq(quotes.id, quoteId));
+
+    revalidatePath("/dashboard/quotes");
+    revalidatePath("/dashboard");
+
+    return { success: true };
+  } catch (error: unknown) {
+    console.error("Erro em deleteQuoteAction:", error);
+    const msg = error instanceof Error ? error.message : "Erro interno ao excluir orçamento.";
+    return { success: false, error: msg };
   }
-
-  const [quote] = await db
-    .select({ id: quotes.id, code: quotes.code })
-    .from(quotes)
-    .where(eq(quotes.id, quoteId))
-    .limit(1);
-
-  if (!quote) {
-    throw new Error("Orçamento não encontrado.");
-  }
-
-  // Verifica se há pedido gerado a partir deste orçamento
-  const linkedOrders = await db
-    .select({ code: orders.code })
-    .from(orders)
-    .where(eq(orders.quoteId, quoteId))
-    .limit(1);
-
-  if (linkedOrders.length > 0) {
-    throw new Error(
-      `Não é possível excluir o orçamento ${quote.code} pois ele já foi convertido no pedido ${linkedOrders[0].code}. Cancele ou remova o pedido primeiro.`
-    );
-  }
-
-  // Remove itens primeiro
-  await db.delete(quoteItems).where(eq(quoteItems.quoteId, quoteId));
-
-  // Remove o orçamento
-  await db.delete(quotes).where(eq(quotes.id, quoteId));
-
-  revalidatePath("/dashboard/quotes");
-  revalidatePath("/dashboard");
-
-  return { success: true };
 }
 
 /**
@@ -430,11 +528,8 @@ export async function convertQuoteToOrderAction(formData: FormData) {
     .set({ status: "aprovado", updatedAt: new Date() })
     .where(eq(quotes.id, quoteId));
 
-  // Gera código único para o pedido PED-YYYY-XXX
-  const currentYear = new Date().getFullYear();
-  const allOrders = await db.select({ code: orders.code }).from(orders);
-  const nextSeq = allOrders.length + 1;
-  const orderCode = `PED-${currentYear}-${String(nextSeq).padStart(3, "0")}`;
+  // Gera código único para o pedido PED-YYYY-XXX sem colisão
+  const orderCode = await getNextOrderCode();
 
   const expectedDeliveryDate = expectedDeliveryDateStr ? new Date(expectedDeliveryDateStr) : new Date(Date.now() + 15 * 86400000);
   const firstDueDate = firstDueDateStr ? new Date(firstDueDateStr) : new Date();
@@ -641,10 +736,8 @@ export async function createDirectOrderAction(formData: FormData) {
     throw new Error("O valor total do pedido deve ser maior que zero.");
   }
 
-  const currentYear = new Date().getFullYear();
-  const allOrders = await db.select({ code: orders.code }).from(orders);
-  const nextSeq = allOrders.length + 1;
-  const orderCode = `PED-${currentYear}-${String(nextSeq).padStart(3, "0")}`;
+  // Gera código único para o pedido PED-YYYY-XXX sem colisão
+  const orderCode = await getNextOrderCode();
 
   const expectedDeliveryDate = expectedDeliveryDateStr
     ? new Date(expectedDeliveryDateStr)

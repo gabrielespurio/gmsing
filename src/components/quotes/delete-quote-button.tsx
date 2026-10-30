@@ -23,7 +23,11 @@ export function DeleteQuoteButton({
   const handleDelete = async () => {
     setIsDeleting(true);
     try {
-      await deleteQuoteAction(quoteId);
+      const res = await deleteQuoteAction(quoteId);
+      if (res && !res.success) {
+        alert(res.error || "Erro ao excluir orçamento.");
+        return;
+      }
       setConfirmOpen(false);
       router.push("/dashboard/quotes");
       router.refresh();
